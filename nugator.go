@@ -29,9 +29,12 @@ import (
   "github.com/containernetworking/cni/pkg/invoke"
   "github.com/containernetworking/cni/pkg/skel"
   "github.com/containernetworking/cni/pkg/types"
+
+  "github.com/davecgh/go-spew/spew"
 )
 
 const defaultCNIDir = "/var/lib/cni/multus"
+const DEBUG = false
 
 var masterpluginEnabled bool
 
@@ -64,6 +67,11 @@ func loadNetConf(bytes []byte) (*NetConf, error) {
 
   if netconf.CNIDir == "" {
     netconf.CNIDir = defaultCNIDir
+  }
+
+  if (DEBUG) {
+    dump_netconf := spew.Sdump(netconf)
+    os.Stderr.WriteString("DOUG !trace ----------\n" + dump_netconf)
   }
 
   return netconf, nil

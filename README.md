@@ -201,7 +201,24 @@ net1      Link encap:Ethernet  HWaddr 0A:58:0A:16:00:05
           inet addr:10.22.0.5  Bcast:0.0.0.0  Mask:255.255.0.0
 ```
 
-
+And then 
 
 ## Some debug output?
+
+If you're going to `spew`, [spew into this little cup man](https://www.youtube.com/watch?v=ouDDj6kr1qo). I used `spew` to dump some datastructures, reminds me of Perl's `data::dumper` in its own right. I added `github.com/davecgh/go-spew/spew` to my imports and...
+
+And added to the `loadNetConf` method, this following section to take a look at what was parsed...
+
+```
+  str := spew.Sdump(netconf)
+  os.Stderr.WriteString("DOUG !trace ----------\n" + str)
+```
+
+## Handy copying util
+
+This copies from my workstation to my test environment, and builds the script out there (which is faster than copying a fat binary in my case)
+
+```
+./utils/copier.sh
+```
 
