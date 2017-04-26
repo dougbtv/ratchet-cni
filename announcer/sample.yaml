@@ -45,13 +45,31 @@ spec:
       command: ["/bin/bash"]
       args:
         - "-c"
-        - "while true; do sleep 10; done"
-    # - name: sample-announce
-    #   image: dougbtv/jq
-    #   command: ["/bin/bash"]
-    #   args:
-    #     - "-c"
-    #     - >
+        - "while true; do sleep 1; done"
+    - name: sample-announce
+      image: dougbtv/jq
+      command: ["/bin/bash"]
+      args:
+        - "-c"
+        - >
+          KUBE_TOKEN=$(</var/run/secrets/kubernetes.io/serviceaccount/token);
+          TARGET_URL=https://kubernetes.default.svc.cluster.local/api/v1/namespaces/default/pods/sample-announce;
+          echo "----------------------- Waiting for target-container";
+          found_it=false;
+          counted=1;
+          while [ "$found_it" = false ]; do
+            container_id=$(curl -sSk -H "Authorization: Bearer $KUBE_TOKEN" $TARGET_URL | jq '.status.containerStatuses[] | select(.name=="target-container") | .containerID';)
+            echo $container_id | grep -P "docker";
+            if [ "$?" = "0" ]; then
+              found_it=true;
+              container_id=$(echo $container_id | sed -e 's/"//g')
+              echo "Found container_id (tries $counted): $container_id";
+            fi;
+            let "counted += 1";
+            sleep 1;
+          done;
+          echo "-----------------------";
+          while true; do sleep 1; done;
     #       KUBE_TOKEN=$(</var/run/secrets/kubernetes.io/serviceaccount/token) &&
     #       podname=$(curl -sSk -H "Authorization: Bearer $KUBE_TOKEN" https://kubernetes.default.svc.cluster.local/api/v1/namespaces/default/pods | jq '.items[] .metadata.name' | grep -i demo | sed -e 's/\"//g') && 
     #       podip=$(curl -sSk -H "Authorization: Bearer $KUBE_TOKEN" https://kubernetes.default.svc.cluster.local/api/v1/namespaces/default/pods/$podname | jq '.status.podIP' | sed -s 's/\"//g') &&
