@@ -318,7 +318,7 @@ func getEtcdData(containerid string, setalive bool) (map[string]string) {
     if err != nil {
 
       logger.Println(fmt.Errorf("possible missing value %s: %v", target_key, err))
-      
+
     } else {
       // print common key info
       // logger.Printf("Get is done. Metadata is %q\n", message_resp)
@@ -357,7 +357,7 @@ func getEtcdData(containerid string, setalive bool) (map[string]string) {
 }
 
 
-func ratchet(netconf *NetConf) error {
+func ratchet(netconf *NetConf,containerid string) error {
 
   var result error
 
@@ -377,6 +377,7 @@ func ratchet(netconf *NetConf) error {
   etcresult := getEtcdData("test123",true)
 
   dump_etcresult := spew.Sdump(etcresult)
+  os.Stderr.WriteString("The containerid: " + containerid + "\n")
   os.Stderr.WriteString("DOUG !trace etcresult ----------\n" + dump_etcresult)
  
 
@@ -398,7 +399,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 
   // Pass a pointer to the NetConf type.
   // logger.Println(reflect.TypeOf(n))
-  ratchet(n)
+  ratchet(n,args.ContainerID)
 
   // for _, delegate := range n.Delegates {
   //   if err := checkDelegate(delegate); err != nil {
@@ -453,7 +454,7 @@ func cmdDel(args *skel.CmdArgs) error {
   }
 
   if (PERFORM_DELETE) {
-    ratchet(in)
+    ratchet(in,args.ContainerID)
   }
 
   // netconfBytes, err := consumeScratchNetConf(args.ContainerID, in.CNIDir)
