@@ -25,7 +25,7 @@ import (
   "time"
   "log"
   "io/ioutil"
-  "reflect"
+  // "reflect"
   "os"
   "path/filepath"
 
@@ -39,6 +39,7 @@ import (
 
 const defaultCNIDir = "/var/lib/cni/multus"
 const DEBUG = false
+const PERFORM_DELETE = false
 
 var logger = log.New(os.Stderr, "", 0)
 
@@ -48,6 +49,7 @@ type NetConf struct {
   types.NetConf
   CNIDir    string                   `json:"cniDir"`
   Delegates []map[string]interface{} `json:"delegates"`
+  Etcd_host string                   `json:"etcd_host"`
 }
 
 //taken from cni/plugins/meta/flannel/flannel.go
@@ -256,7 +258,14 @@ func ratchet(netconf *NetConf) {
     os.Stderr.WriteString("After sleep......................")
   }
 
+  logger.Println("!trace ........ etcd_host: " + netconf.Etcd_host)
+
+  // !trace !bang
+  // This is how you call up koko.
   // koko.VethCreator("foo","192.168.2.100/24","in1","bar","192.168.2.101/24","in2")
+
+  // Ok next steps....
+  // We need to get shit from etcd.
 
 
 }
@@ -273,46 +282,49 @@ func cmdAdd(args *skel.CmdArgs) error {
   // logger.Println(reflect.TypeOf(n))
   ratchet(n)
 
-  for _, delegate := range n.Delegates {
-    if err := checkDelegate(delegate); err != nil {
-      return fmt.Errorf("Multus: Err in delegate conf: %v", err)
-    }
-  }
+  // for _, delegate := range n.Delegates {
+  //   if err := checkDelegate(delegate); err != nil {
+  //     return fmt.Errorf("Multus: Err in delegate conf: %v", err)
+  //   }
+  // }
 
-  // dump_args := spew.Sdump(args)
-  // os.Stderr.WriteString("DOUG !trace ----------\n" + dump_args)
+  // // dump_args := spew.Sdump(args)
+  // // os.Stderr.WriteString("DOUG !trace ----------\n" + dump_args)
 
 
-  if err := saveDelegates(args.ContainerID, n.CNIDir, n.Delegates); err != nil {
-    return fmt.Errorf("Multus: Err in saving the delegates: %v", err)
-  }
+  // if err := saveDelegates(args.ContainerID, n.CNIDir, n.Delegates); err != nil {
+  //   return fmt.Errorf("Multus: Err in saving the delegates: %v", err)
+  // }
 
-  podifName := getifname()
-  var mIndex int
-  for index, delegate := range n.Delegates {
-    err, r := delegateAdd(podifName, args.IfName, delegate, true)
-    if err != true {
-      result = r
-      mIndex = index
-    } else if (err != false) && r != nil {
-      return r
-    }
-  }
+  // podifName := getifname()
+  // var mIndex int
+  // for index, delegate := range n.Delegates {
+  //   err, r := delegateAdd(podifName, args.IfName, delegate, true)
+  //   if err != true {
+  //     result = r
+  //     mIndex = index
+  //   } else if (err != false) && r != nil {
+  //     return r
+  //   }
+  // }
 
-  for index, delegate := range n.Delegates {
-    err, r := delegateAdd(podifName, args.IfName, delegate, false)
-    if err != true {
-      result = r
-    } else if (err != false) && r != nil {
-      perr := clearPlugins(mIndex, index, args.IfName, n.Delegates)
-      if perr != nil {
-        return perr
-      }
-      return r
-    }
-  }
+  // for index, delegate := range n.Delegates {
+  //   err, r := delegateAdd(podifName, args.IfName, delegate, false)
+  //   if err != true {
+  //     result = r
+  //   } else if (err != false) && r != nil {
+  //     perr := clearPlugins(mIndex, index, args.IfName, n.Delegates)
+  //     if perr != nil {
+  //       return perr
+  //     }
+  //     return r
+  //   }
+  // }
+
+  // return result
 
   return result
+
 }
 
 func cmdDel(args *skel.CmdArgs) error {
@@ -322,24 +334,28 @@ func cmdDel(args *skel.CmdArgs) error {
     return err
   }
 
-  netconfBytes, err := consumeScratchNetConf(args.ContainerID, in.CNIDir)
-  if err != nil {
-    return fmt.Errorf("Multus: Err in  reading the delegates: %v", err)
+  if (PERFORM_DELETE) {
+    ratchet(in)
   }
 
-  var Delegates []map[string]interface{}
-  if err := json.Unmarshal(netconfBytes, &Delegates); err != nil {
-    return fmt.Errorf("Multus: failed to load netconf: %v", err)
-  }
+  // netconfBytes, err := consumeScratchNetConf(args.ContainerID, in.CNIDir)
+  // if err != nil {
+  //   return fmt.Errorf("Multus: Err in  reading the delegates: %v", err)
+  // }
 
-  podifName := getifname()
-  for _, delegate := range Delegates {
-    r := delegateDel(podifName, args.IfName, delegate)
-    if r != nil {
-      return r
-    }
-    result = r
-  }
+  // var Delegates []map[string]interface{}
+  // if err := json.Unmarshal(netconfBytes, &Delegates); err != nil {
+  //   return fmt.Errorf("Multus: failed to load netconf: %v", err)
+  // }
+
+  // podifName := getifname()
+  // for _, delegate := range Delegates {
+  //   r := delegateDel(podifName, args.IfName, delegate)
+  //   if r != nil {
+  //     return r
+  //   }
+  //   result = r
+  // }
 
   return result
 }
