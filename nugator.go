@@ -43,6 +43,8 @@ const defaultCNIDir = "/var/lib/cni/multus"
 const DEBUG = false
 const PERFORM_DELETE = false
 
+var etcd_host string
+
 var logger = log.New(os.Stderr, "", 0)
 
 var masterpluginEnabled bool
@@ -249,6 +251,112 @@ func clearPlugins(mIdx int, pIdx int, argIfname string, delegates []map[string]i
   return nil
 }
 
+// vEth is a structure to descrive veth interfaces.
+type announceData struct {
+  Pod_name string
+  Pair_name string
+  Public_ip string
+  Local_ip string
+  Local_ifname string
+  Pair_ip string
+  Pair_ifname string
+  Primary string
+}
+
+/*
+pod_name
+pair_name
+public_ip
+local_ip
+local_ifname
+pair_ip
+pair_ifname
+primary
+*/
+
+func getEtcdData(containerid string, setalive bool) (map[string]string) {
+
+  all := make(map[string]string)
+
+  // Ok next steps....
+  // We need to get shit from etcd.
+
+  cfg := client.Config{
+    Endpoints:               []string{"http://" + etcd_host + ":2379"},
+    Transport:               client.DefaultTransport,
+    // set timeout per request to fail fast when the target endpoint is unavailable
+    HeaderTimeoutPerRequest: time.Second,
+  }
+  c, err := client.New(cfg)
+  if err != nil {
+    log.Fatal(err)
+  }
+  kapi := client.NewKeysAPI(c)
+
+  // adata := announceData{}
+
+  // All the properties we can have.
+  all["pod_name"] = ""
+  all["pair_name"] = ""
+  all["public_ip"] = ""
+  all["local_ip"] = ""
+  all["local_ifname"] = ""
+  all["pair_ip"] = ""
+  all["pair_ifname"] = "asdf"
+  all["primary"] = ""
+  all["isalive"] = ""
+
+  for k, _ := range all { 
+    // Print all possibilities...
+    // logger.Printf("key[%s] value[%s]\n", k, v)
+
+    // get a key's value
+    // logger.Print("Getting '/ratchet/" + containerid + "/" + k + "' key value")
+    getcfg := &client.GetOptions{Recursive: true}
+    target_key := "/ratchet/" + containerid + "/" + k
+    message_resp, err := kapi.Get(context.Background(), target_key, getcfg)
+    if err != nil {
+
+      logger.Println(fmt.Errorf("possible missing value %s: %v", target_key, err))
+      
+    } else {
+      // print common key info
+      // logger.Printf("Get is done. Metadata is %q\n", message_resp)
+      // print value
+
+      // dump_resp := spew.Sdump(message_resp)
+      // os.Stderr.WriteString("DOUG !trace message_resp ----------\n" + dump_resp)
+
+      // dump_adata := spew.Sdump(adata)
+      // os.Stderr.WriteString("DOUG !trace adata ----------\n" + dump_adata)
+
+      all[k] = message_resp.Node.Value;
+
+      // logger.Printf("%q key has %q value\n", message_resp.Node.Key, message_resp.Node.Value)
+    }
+
+
+  }
+
+  if (setalive) {
+
+    // set "/foo" key with "bar" value
+    // log.Print("Setting '/foo' key with 'bar' value")
+    _, err := kapi.Set(context.Background(), "/ratchet/" + containerid + "/isalive", "true", nil)
+    if err != nil {
+      log.Fatal(err)
+    } else {
+      // print common key info
+      // log.Printf("Set is done. Metadata is %q\n", resp)
+    }
+
+  }
+
+  return all
+
+}
+
+
 func ratchet(netconf *NetConf) error {
 
   var result error
@@ -262,51 +370,20 @@ func ratchet(netconf *NetConf) error {
     os.Stderr.WriteString("After sleep......................")
   }
 
-  logger.Println("!trace ........ etcd_host: " + netconf.Etcd_host)
+  // Keep out etcdhost around.
+  etcd_host = netconf.Etcd_host
+
+  // Go and pick up results from etcd.
+  etcresult := getEtcdData("test123",true)
+
+  dump_etcresult := spew.Sdump(etcresult)
+  os.Stderr.WriteString("DOUG !trace etcresult ----------\n" + dump_etcresult)
+ 
 
   // !trace !bang
   // This is how you call up koko.
   // koko.VethCreator("foo","192.168.2.100/24","in1","bar","192.168.2.101/24","in2")
 
-  // Ok next steps....
-  // We need to get shit from etcd.
-
-  cfg := client.Config{
-    Endpoints:               []string{"http://" + netconf.Etcd_host + ":2379"},
-    Transport:               client.DefaultTransport,
-    // set timeout per request to fail fast when the target endpoint is unavailable
-    HeaderTimeoutPerRequest: time.Second,
-  }
-  c, err := client.New(cfg)
-  if err != nil {
-    log.Fatal(err)
-  }
-  kapi := client.NewKeysAPI(c)
-
-  /*
-  // set "/foo" key with "bar" value
-  log.Print("Setting '/foo' key with 'bar' value")
-  resp, err := kapi.Set(context.Background(), "/foo", "bar", nil)
-  if err != nil {
-    log.Fatal(err)
-  } else {
-    // print common key info
-    log.Printf("Set is done. Metadata is %q\n", resp)
-  }
-  */
-
-  // get "/foo" key's value
-  logger.Print("Getting '/message' key value")
-  message_resp, err := kapi.Get(context.Background(), "/message", nil)
-  if err != nil {
-    logger.Fatal(err)
-  } else {
-    // print common key info
-    // logger.Printf("Get is done. Metadata is %q\n", message_resp)
-    // print value
-    logger.Printf("%q key has %q value\n", message_resp.Node.Key, message_resp.Node.Value)
-  }
- 
   return result
 
 }
