@@ -279,6 +279,31 @@ Is koko all set to go?
 
 let's try it.
 
+have to modify koko.
+
+change "package main" to "package koko".
+
+Public methods start with an upper case letter.
+
+And... 
+
+We need to abstract the main() which is.... all for command line.
+
+
+
+## Etcd. 
+
+Installed etcd (v2? e.g. not v3) from yum, enabled, started. Test it...
+
+And it's there.
+
+```
+[centos@cni scripts]$ curl -L -X PUT http://localhost:2379/v2/keys/message -d value="sup sup"
+{"action":"set","node":{"key":"/message","value":"sup sup","modifiedIndex":4,"createdIndex":4}}
+[centos@cni scripts]$ curl -L  http://localhost:2379/v2/keys/message 
+{"action":"get","node":{"key":"/message","value":"sup sup","modifiedIndex":4,"createdIndex":4}}
+```
+
 ## Getting etcd data in go
 
 ## Check if partner is up

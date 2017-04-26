@@ -18,11 +18,12 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/davecgh/go-spew/spew"
 )
 
 func TestOne() {
 
-	os.Stderr.WriteString("Hello from koko......................")
+	os.Stderr.WriteString("Hello from koko......................\n")
 	return
 
 }
@@ -325,6 +326,59 @@ func usage() {
 	fmt.Print(doc)
 
 }
+
+func VethCreator (local_container string, local_ipnetmask string, local_ifname string, pair_container string, pair_ipnetmask string, pair_ifname string) (err error) {
+
+	vethA := vEth{}
+	vethB := vEth{}
+
+	// Get the pieces for vethA ----------------------------------
+
+	vethA.nsName, err = getDockerContainerNS(local_container)
+
+	ip, mask, err := net.ParseCIDR(local_ipnetmask)
+	if err != nil {
+		err = fmt.Errorf("failed to parse IP addr %s: %v", local_ipnetmask, err)
+		return err
+	}
+
+	vethA.linkName = local_ifname
+	vethA.ipAddr.IP = ip
+	vethA.ipAddr.Mask = mask.Mask
+	vethA.withIPAddr = true
+
+	// Get the pieces for vethB ----------------------------------
+
+	vethB.nsName, err = getDockerContainerNS(pair_container)
+
+	ip, mask, err2 := net.ParseCIDR(pair_ipnetmask)
+	if err2 != nil {
+		err2 = fmt.Errorf("failed to parse IP addr %s: %v", pair_ipnetmask, err2)
+		return err2
+	}
+
+	vethB.linkName = pair_ifname
+	vethB.ipAddr.IP = ip
+	vethB.ipAddr.Mask = mask.Mask
+	vethB.withIPAddr = true
+
+	// -------------------- doug debug.
+
+	dump_vetha := spew.Sdump(vethA)
+  os.Stderr.WriteString("DOUG !trace vethA ----------\n" + dump_vetha)
+
+	dump_vethb := spew.Sdump(vethB)
+  os.Stderr.WriteString("DOUG !trace vethB ----------\n" + dump_vethb)
+  
+
+	// ------ And finally don't forget...
+	makeVeth(vethA, vethB)
+
+	return
+
+}
+
+
 
 /**
 Usage:

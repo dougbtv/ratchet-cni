@@ -23,7 +23,9 @@ import (
   "encoding/json"
   "fmt"
   "time"
+  "log"
   "io/ioutil"
+  "reflect"
   "os"
   "path/filepath"
 
@@ -36,7 +38,9 @@ import (
 )
 
 const defaultCNIDir = "/var/lib/cni/multus"
-const DEBUG = true
+const DEBUG = false
+
+var logger = log.New(os.Stderr, "", 0)
 
 var masterpluginEnabled bool
 
@@ -71,16 +75,8 @@ func loadNetConf(bytes []byte) (*NetConf, error) {
     netconf.CNIDir = defaultCNIDir
   }
 
-  if (DEBUG) {
-    dump_netconf := spew.Sdump(netconf)
-    koko.TestOne()
-    os.Stderr.WriteString("DOUG !trace ----------\n" + dump_netconf)
-    os.Stderr.WriteString("Before sleep......................")
-    time.Sleep(10 * time.Second)
-    os.Stderr.WriteString("After sleep......................")
-  }
-
   return netconf, nil
+
 }
 
 func saveScratchNetConf(containerID, dataDir string, netconf []byte) error {
@@ -249,6 +245,22 @@ func clearPlugins(mIdx int, pIdx int, argIfname string, delegates []map[string]i
   return nil
 }
 
+func ratchet(netconf *NetConf) {
+
+  if (DEBUG) {
+    dump_netconf := spew.Sdump(netconf)
+    koko.TestOne()
+    os.Stderr.WriteString("DOUG !trace ----------\n" + dump_netconf)
+    os.Stderr.WriteString("Before sleep......................")
+    time.Sleep(10 * time.Second)
+    os.Stderr.WriteString("After sleep......................")
+  }
+
+  // koko.VethCreator("foo","192.168.2.100/24","in1","bar","192.168.2.101/24","in2")
+
+
+}
+
 func cmdAdd(args *skel.CmdArgs) error {
 
   var result error
@@ -256,6 +268,10 @@ func cmdAdd(args *skel.CmdArgs) error {
   if err != nil {
     return err
   }
+
+  // Pass a pointer to the NetConf type.
+  // logger.Println(reflect.TypeOf(n))
+  ratchet(n)
 
   for _, delegate := range n.Delegates {
     if err := checkDelegate(delegate); err != nil {
@@ -337,5 +353,9 @@ func versionInfo(args *skel.CmdArgs) error {
 }
 
 func main() {
+  // logger := 
+  if (DEBUG) {
+    logger.Println("[LOGGING ENABLED]")
+  }
   skel.PluginMain(cmdAdd, cmdDel)
 }
