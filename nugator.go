@@ -22,6 +22,7 @@ package main
 import (
   "encoding/json"
   "fmt"
+  "time"
   "io/ioutil"
   "os"
   "path/filepath"
@@ -31,10 +32,11 @@ import (
   "github.com/containernetworking/cni/pkg/types"
 
   "github.com/davecgh/go-spew/spew"
+  "github.com/redhat-nfvpe/koko"
 )
 
 const defaultCNIDir = "/var/lib/cni/multus"
-const DEBUG = false
+const DEBUG = true
 
 var masterpluginEnabled bool
 
@@ -71,7 +73,11 @@ func loadNetConf(bytes []byte) (*NetConf, error) {
 
   if (DEBUG) {
     dump_netconf := spew.Sdump(netconf)
+    koko.TestOne()
     os.Stderr.WriteString("DOUG !trace ----------\n" + dump_netconf)
+    os.Stderr.WriteString("Before sleep......................")
+    time.Sleep(10 * time.Second)
+    os.Stderr.WriteString("After sleep......................")
   }
 
   return netconf, nil
@@ -244,6 +250,7 @@ func clearPlugins(mIdx int, pIdx int, argIfname string, delegates []map[string]i
 }
 
 func cmdAdd(args *skel.CmdArgs) error {
+
   var result error
   n, err := loadNetConf(args.StdinData)
   if err != nil {
@@ -255,6 +262,10 @@ func cmdAdd(args *skel.CmdArgs) error {
       return fmt.Errorf("Multus: Err in delegate conf: %v", err)
     }
   }
+
+  // dump_args := spew.Sdump(args)
+  // os.Stderr.WriteString("DOUG !trace ----------\n" + dump_args)
+
 
   if err := saveDelegates(args.ContainerID, n.CNIDir, n.Delegates); err != nil {
     return fmt.Errorf("Multus: Err in saving the delegates: %v", err)

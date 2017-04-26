@@ -222,3 +222,67 @@ This copies from my workstation to my test environment, and builds the script ou
 ./utils/copier.sh
 ```
 
+## Ok, sidequest: The announcer.
+
+We're going to have pods announce that they're up with a companion job that picks up the container ID and shoots some data into etcd. Let's get that going cause we're going to need to generally emulate this in development so that the CNI plugin can read up that info.
+
+* Create [etcd pods according to my gist for k8s jobs](https://gist.github.com/dougbtv/67589a7b3e443d1b4e2cdf05698f58ca)
+
+Then spin up the `./announcer/sample.yaml` with:
+
+```
+[centos@kube-master announcer]$ kubectl create -f sample.yaml 
+[centos@kube-master announcer]$ watch -n1 kubectl get pods --show-all
+[centos@kube-master announcer]$ kubectl logs -f sample-announce sample-announce
+```
+
+And you can see it have the steps I outlined on my pad...
+
+* Get container ID
+* store container id in etcd, along with meta data.
+
+Generally with this kind of environment:
+
+```yaml
+env:
+  - name: "POD_NAME"
+    value: "sample-announce"
+  - name: "TARGET_CONTAINER"
+    value: "target-container"
+  - name: "PUBLIC_IP"
+    value: "1.1.1.1"
+  - name: "LOCAL_IP"
+    value: "192.168.2.100"
+  - name: "LOCAL_IFNAME"
+    value: "in1"
+  - name: "PAIR_NAME"
+    value: "pair-pod"
+  - name: "PAIR_IP"
+    value: "192.168.2.101"
+  - name: "PAIR_IFNAME"
+    value: "in2"
+  - name: "PRIMARY"
+    value: "true"
+```
+
+## Big questions still left
+
+Primarily: If we're controlling how the pod gets its network -- how does it get enough network to talk to Kubernetes API? 
+
+Yikes. So...
+
+current game plan: Use multus CNI. Have it create flannel networking for the pod, and then secondarily -- it calls nugator (new name? ratchet.)
+
+## Calling another module in go...
+
+Is koko all set to go?
+
+let's try it.
+
+## Getting etcd data in go
+
+## Check if partner is up
+
+## ASk if primary
+
+## Execute koko
