@@ -21,6 +21,42 @@
 			"revisionTime": "2017-03-17T14:32:14Z"
 		},
 		{
+			"checksumSHA1": "wHhJJTvaTy9lACtCy67DmTc8z/o=",
+			"path": "github.com/coreos/etcd/client",
+			"revision": "633a0a847b4d55f2af727a1a88eae0f43e52baaf",
+			"revisionTime": "2017-04-26T20:31:17Z"
+		},
+		{
+			"checksumSHA1": "eQeBivfiHELecANXiU9vYfFdjQU=",
+			"path": "github.com/coreos/etcd/pkg/pathutil",
+			"revision": "633a0a847b4d55f2af727a1a88eae0f43e52baaf",
+			"revisionTime": "2017-04-26T20:31:17Z"
+		},
+		{
+			"checksumSHA1": "u7RP5+8jxmJVCdPilU4uPQKfmHg=",
+			"path": "github.com/coreos/etcd/pkg/testutil",
+			"revision": "633a0a847b4d55f2af727a1a88eae0f43e52baaf",
+			"revisionTime": "2017-04-26T20:31:17Z"
+		},
+		{
+			"checksumSHA1": "qd+I6M6ot7HOpADC8KNrW9xSurQ=",
+			"path": "github.com/coreos/etcd/pkg/types",
+			"revision": "633a0a847b4d55f2af727a1a88eae0f43e52baaf",
+			"revisionTime": "2017-04-26T20:31:17Z"
+		},
+		{
+			"checksumSHA1": "sp2FkEyaIGiQFOEZCTDkBZgyHOs=",
+			"path": "github.com/coreos/etcd/version",
+			"revision": "633a0a847b4d55f2af727a1a88eae0f43e52baaf",
+			"revisionTime": "2017-04-26T20:31:17Z"
+		},
+		{
+			"checksumSHA1": "FMvhBjVM/SZOPAJwlnnPQAfdRCw=",
+			"path": "github.com/coreos/go-semver/semver",
+			"revision": "5e3acbb5668c4c3deb4842615c4098eb61fb6b1e",
+			"revisionTime": "2017-02-09T20:17:57Z"
+		},
+		{
 			"checksumSHA1": "WRu+mhZ2PfQu27qRr69HVGjtN4Q=",
 			"path": "github.com/davecgh/go-spew/spew",
 			"revision": "346938d642f2ec3594ed81d874461961cd0faa76",
@@ -235,6 +271,12 @@
 			"revisionTime": "2017-01-30T11:31:45Z"
 		},
 		{
+			"checksumSHA1": "TjT0gxkY8JQ7JLDlCb72vqcl/50=",
+			"path": "github.com/ugorji/go/codec",
+			"revision": "708a42d246822952f38190a8d8c4e6b16a0e600c",
+			"revisionTime": "2017-03-12T11:21:14Z"
+		},
+		{
 			"checksumSHA1": "IPejaa9lSiONSHVPdsKLBYVrYPg=",
 			"path": "github.com/vishvananda/netlink",
 			"revision": "2632e243fb1a61b67ad23b04c16a5a48315e9391",
@@ -263,6 +305,18 @@
 			"path": "golang.org/x/sys/windows",
 			"revision": "9f30dcbe5be197894515a338a9bda9253567ea8f",
 			"revisionTime": "2017-04-25T04:17:24Z"
+		},
+		{
+			"checksumSHA1": "538I8ghUdvZa25NxgMUDpq14Qic=",
+			"path": "gopkg.in/check.v1",
+			"revision": "20d25e2804050c1cd24a7eea1e7a6447dd0e74ec",
+			"revisionTime": "2016-12-08T18:13:25Z"
+		},
+		{
+			"checksumSHA1": "QX69hdf0wsAInBxC21QNkmXXD4o=",
+			"path": "gopkg.in/yaml.v2",
+			"revision": "cd8b52f8269e0feb286dfeef29f8fe4d5b397e0b",
+			"revisionTime": "2017-04-07T17:21:22Z"
 		}
 	],
 	"rootPath": "nugator"

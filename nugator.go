@@ -32,9 +32,11 @@ import (
   "github.com/containernetworking/cni/pkg/invoke"
   "github.com/containernetworking/cni/pkg/skel"
   "github.com/containernetworking/cni/pkg/types"
+  "golang.org/x/net/context"
 
   "github.com/davecgh/go-spew/spew"
   "github.com/redhat-nfvpe/koko"
+  "github.com/coreos/etcd/client"
 )
 
 const defaultCNIDir = "/var/lib/cni/multus"
@@ -247,7 +249,9 @@ func clearPlugins(mIdx int, pIdx int, argIfname string, delegates []map[string]i
   return nil
 }
 
-func ratchet(netconf *NetConf) {
+func ratchet(netconf *NetConf) error {
+
+  var result error
 
   if (DEBUG) {
     dump_netconf := spew.Sdump(netconf)
@@ -267,6 +271,43 @@ func ratchet(netconf *NetConf) {
   // Ok next steps....
   // We need to get shit from etcd.
 
+  cfg := client.Config{
+    Endpoints:               []string{"http://" + netconf.Etcd_host + ":2379"},
+    Transport:               client.DefaultTransport,
+    // set timeout per request to fail fast when the target endpoint is unavailable
+    HeaderTimeoutPerRequest: time.Second,
+  }
+  c, err := client.New(cfg)
+  if err != nil {
+    log.Fatal(err)
+  }
+  kapi := client.NewKeysAPI(c)
+
+  /*
+  // set "/foo" key with "bar" value
+  log.Print("Setting '/foo' key with 'bar' value")
+  resp, err := kapi.Set(context.Background(), "/foo", "bar", nil)
+  if err != nil {
+    log.Fatal(err)
+  } else {
+    // print common key info
+    log.Printf("Set is done. Metadata is %q\n", resp)
+  }
+  */
+
+  // get "/foo" key's value
+  logger.Print("Getting '/message' key value")
+  message_resp, err := kapi.Get(context.Background(), "/message", nil)
+  if err != nil {
+    logger.Fatal(err)
+  } else {
+    // print common key info
+    // logger.Printf("Get is done. Metadata is %q\n", message_resp)
+    // print value
+    logger.Printf("%q key has %q value\n", message_resp.Node.Key, message_resp.Node.Value)
+  }
+ 
+  return result
 
 }
 
