@@ -335,7 +335,9 @@ func getEtcdMetaData(containerid string, setalive bool) (map[string]string) {
     message_resp, err := kapi.Get(context.Background(), target_key, getcfg)
     if err != nil {
 
-      logger.Println(fmt.Errorf("possible missing value %s: %v", target_key, err))
+      // For now, this seems to be just the missing values.
+      // ...which are generally fine.
+      // logger.Println(fmt.Errorf("possible missing value %s: %v", target_key, err))
 
     } else {
       // print common key info
@@ -399,27 +401,43 @@ func ratchet(netconf *NetConf,containerid string) error {
     tries++
 
     if (DEBUG) {
-      logger.Printf("Looking for containerid: %v (%v retries)\n",containerid,tries);
+      logger.Printf("Am I alive? containerid: %v (%v retries)\n",containerid,tries);
     }
 
     // We either timeout, or, we're alive.
     if (tries >= ALIVE_WAIT_RETRIES || i_am_alive) {
       return fmt.Errorf("Timeout: could not find that container is alive in %v tries", tries)
     }
+
+    // Wait for however long.
     time.Sleep(ALIVE_WAIT_SECONDS * time.Second)
   }
 
+  // If it's determined that we're alive, now we can see if we're primary.
+  // If we're not primary, we can just exit right now.
+  // Cause the primary side will add to this pair.
 
+  // Go and pick up metadata about me from etcd.
+  my_meta := getEtcdMetaData(containerid,true)
 
+  if (my_meta["primary"] != "true") {
+    // Ok, we're not primary. So... time to exit.
+    if (DEBUG) {
+      logger.Printf("Normal termination, this container is not primary (name: %v, containerid: %v, primary: %v)",my_meta["pod_name"],containerid,my_meta["primary"]);
+    }
 
-  // Go and pick up results from etcd.
-  etcresult := getEtcdMetaData("test123",true)
+    return nil
+  }
 
-  pair_alive := isContainerAlive(etcresult["pair_name"])
+  // Now we want to check and see if the pair container is alive.
+  // So it's time to go into a loop and do that.
+  // if the pair container is alive -- bada bing, we can execute koko.
 
-  dump_etcresult := spew.Sdump(etcresult)
+  pair_alive := isContainerAlive(my_meta["pair_name"])
+
+  dump_my_meta := spew.Sdump(my_meta)
   os.Stderr.WriteString("The containerid: " + containerid + "\n")
-  os.Stderr.WriteString("DOUG !trace etcresult ----------\n" + dump_etcresult)
+  os.Stderr.WriteString("DOUG !trace my_meta ----------\n" + dump_my_meta)
   os.Stderr.WriteString("DOUG !trace pair_alive ----------" + fmt.Sprintf("%t",pair_alive) + "\n")
 
   // !trace !bang
