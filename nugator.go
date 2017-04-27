@@ -45,6 +45,8 @@ const PERFORM_DELETE = false
 
 var etcd_host string
 
+var kapi client.KeysAPI
+
 var logger = log.New(os.Stderr, "", 0)
 
 var masterpluginEnabled bool
@@ -278,21 +280,6 @@ func getEtcdData(containerid string, setalive bool) (map[string]string) {
 
   all := make(map[string]string)
 
-  // Ok next steps....
-  // We need to get shit from etcd.
-
-  cfg := client.Config{
-    Endpoints:               []string{"http://" + etcd_host + ":2379"},
-    Transport:               client.DefaultTransport,
-    // set timeout per request to fail fast when the target endpoint is unavailable
-    HeaderTimeoutPerRequest: time.Second,
-  }
-  c, err := client.New(cfg)
-  if err != nil {
-    log.Fatal(err)
-  }
-  kapi := client.NewKeysAPI(c)
-
   // adata := announceData{}
 
   // All the properties we can have.
@@ -302,7 +289,7 @@ func getEtcdData(containerid string, setalive bool) (map[string]string) {
   all["local_ip"] = ""
   all["local_ifname"] = ""
   all["pair_ip"] = ""
-  all["pair_ifname"] = "asdf"
+  all["pair_ifname"] = ""
   all["primary"] = ""
   all["isalive"] = ""
 
@@ -487,10 +474,28 @@ func versionInfo(args *skel.CmdArgs) error {
 
 }
 
+func initEtcd() {
+
+  // Make a connection to etcd. Then we reuse the "kapi"
+
+  cfg := client.Config{
+    Endpoints:               []string{"http://" + etcd_host + ":2379"},
+    Transport:               client.DefaultTransport,
+    // set timeout per request to fail fast when the target endpoint is unavailable
+    HeaderTimeoutPerRequest: time.Second,
+  }
+  c, err := client.New(cfg)
+  if err != nil {
+    log.Fatal(err)
+  }
+  kapi = client.NewKeysAPI(c)
+}
+
 func main() {
   // logger := 
   if (DEBUG) {
     logger.Println("[LOGGING ENABLED]")
   }
+  initEtcd()
   skel.PluginMain(cmdAdd, cmdDel)
 }
