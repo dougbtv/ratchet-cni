@@ -304,10 +304,49 @@ And it's there.
 {"action":"get","node":{"key":"/message","value":"sup sup","modifiedIndex":4,"createdIndex":4}}
 ```
 
-## Getting etcd data in go
+## Necessary steps...
 
-## Check if partner is up
+* Getting etcd data in go
+* Check if partner is up
+* ASk if primary
+* Execute koko
 
-## ASk if primary
+## Getting ready to run in kubernetes
 
-## Execute koko
+Where will my logs be?
+
+```
+dougbtv [8:49 AM] 
+I'm working on a sample/toy CNI plugin, and I'm making some solid progress developing it on a local machine using the `./scripts/docker-run.sh` script from the CNI github repo -- I output to stdout when I need to debug -- can I use the same methodology when I run it with kubernetes, and where will those logs wind up? (edited)
+
+[8:50] 
+(or, should I write to a flat logfile, or... I'll take any recommendations, thanks)
+
+aanm [8:52 AM] 
+@dougbtv the cni output should appear in kubelet logs
+
+dougbtv [8:52 AM] 
+@aanm awesome! appreciate the pointer
+
+[8:53] 
+(also, thank you! cheers :coffee: )
+
+aanm [8:54 AM] 
+@dougbtv I'm not sure if you have to run kubelet with a more verbose log message, I've running with `--v=2` and I see the logs
+```
+
+More discussion there -- I guess it's sort of unknown. How the heck do these guys actually trial their stuff? *shrugs*
+
+## Running through the tests
+
+Ok, so in the `./utils/` folder there three scripts.
+
+You can use them to populate etcd data as necessary.
+
+```
+[centos@cni scripts]$ ./delete_etcd.sh 
+[centos@cni scripts]$ ./etcd_populator.sh 774cff155aca9e101b222a6687ba332fc66fe3194d92c07efed30e20527f4666
+[centos@cni scripts]$ ./pair_etcd_populator.sh ea74dcb8e17688297bb6e74d7a69e110b06dafeafcb799430dc5fd8267764175
+```
+
+E.g. spin up a `docker-run.sh` instance, grab the containerid, then use 'em there.

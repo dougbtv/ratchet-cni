@@ -34,7 +34,7 @@ import (
   "github.com/containernetworking/cni/pkg/types"
   "golang.org/x/net/context"
 
-  "github.com/davecgh/go-spew/spew"
+  // "github.com/davecgh/go-spew/spew"
   "github.com/redhat-nfvpe/koko"
   "github.com/coreos/etcd/client"
 )
@@ -280,6 +280,20 @@ func isContainerAlive(containername string) bool {
 
 }
 
+func getContainerIDByName(containername string) (error, string) {
+  
+  target_key := "/ratchet/byname/" + containername
+  resp_containerid, err := kapi.Get(context.Background(), target_key, nil)
+  if err != nil {
+
+      return fmt.Errorf("Error picking up container id by name: %v",containername), ""
+
+    } else {
+      return nil, resp_containerid.Node.Value;
+    }
+
+}
+
 func amIAlive(containerid string) bool {
   isalive := false
 
@@ -406,7 +420,7 @@ func ratchet(netconf *NetConf,containerid string) error {
 
     // We either timeout, or, we're alive.
     if (tries >= ALIVE_WAIT_RETRIES || i_am_alive) {
-      return fmt.Errorf("Timeout: could not find that container is alive in %v tries", tries)
+      return fmt.Errorf("Timeout: could not find this container is alive via metadata in %v tries", tries)
     }
 
     // Wait for however long.
@@ -429,16 +443,47 @@ func ratchet(netconf *NetConf,containerid string) error {
     return nil
   }
 
+  // Check to see there's a valid pair name.
+  if (len(my_meta["pair_name"]) <= 1) {
+    // That's not good.
+    return fmt.Errorf("Pair name appears to be invalid: %v", my_meta["pair_name"])
+  }
+
   // Now we want to check and see if the pair container is alive.
   // So it's time to go into a loop and do that.
   // if the pair container is alive -- bada bing, we can execute koko.
 
-  pair_alive := isContainerAlive(my_meta["pair_name"])
+  for isContainerAlive(my_meta["pair_name"]) == false {
+    
+    tries++
 
-  dump_my_meta := spew.Sdump(my_meta)
-  os.Stderr.WriteString("The containerid: " + containerid + "\n")
-  os.Stderr.WriteString("DOUG !trace my_meta ----------\n" + dump_my_meta)
-  os.Stderr.WriteString("DOUG !trace pair_alive ----------" + fmt.Sprintf("%t",pair_alive) + "\n")
+    if (DEBUG) {
+      logger.Printf("Is pair alive? pair_name: %v (%v retries)\n",my_meta["pair_name"],tries);
+    }
+
+    // We either timeout, or, we're alive.
+    if (tries >= ALIVE_WAIT_RETRIES || i_am_alive) {
+      return fmt.Errorf("Timeout: could not find that pair container is alive via metadata in %v tries", tries)
+    }
+
+    // Wait for however long.
+    time.Sleep(ALIVE_WAIT_SECONDS * time.Second)
+
+  }
+
+  // Alright, given that... we should have a valid pair.
+  // So let's pick up the pair container id.
+  pairid_err, pair_containerid := getContainerIDByName(my_meta["pair_name"])
+  if (pairid_err != nil) {
+    return pairid_err
+  }
+
+  logger.Printf("And my pair's container id is: %v",pair_containerid)
+
+  // dump_my_meta := spew.Sdump(my_meta)
+  // os.Stderr.WriteString("The containerid: " + containerid + "\n")
+  // os.Stderr.WriteString("DOUG !trace my_meta ----------\n" + dump_my_meta)
+  // os.Stderr.WriteString("DOUG !trace pair_alive ----------" + fmt.Sprintf("%t",pair_alive) + "\n")
 
   // !trace !bang
   // This is how you call up koko.
