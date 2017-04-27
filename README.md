@@ -350,3 +350,12 @@ You can use them to populate etcd data as necessary.
 ```
 
 E.g. spin up a `docker-run.sh` instance, grab the containerid, then use 'em there.
+
+## Some fixable mini snags
+
+Yeah, so right now it's not deleting the interfaces, so...
+
+```
+[centos@cni scripts]$ sudo ip link delete in1
+```
+

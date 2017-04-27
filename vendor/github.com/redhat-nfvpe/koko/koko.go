@@ -350,6 +350,10 @@ func VethCreator (local_container string, local_ipnetmask string, local_ifname s
 	// Get the pieces for vethB ----------------------------------
 
 	vethB.nsName, err = getDockerContainerNS(pair_container)
+	if err != nil {
+		err = fmt.Errorf("Failure to get docker container ns -- %v: %v", pair_container, err)
+		return err
+	}
 
 	ip, mask, err2 := net.ParseCIDR(pair_ipnetmask)
 	if err2 != nil {
@@ -374,7 +378,7 @@ func VethCreator (local_container string, local_ipnetmask string, local_ifname s
 	// ------ And finally don't forget...
 	makeVeth(vethA, vethB)
 
-	return
+	return nil
 
 }
 

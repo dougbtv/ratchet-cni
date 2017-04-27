@@ -478,6 +478,7 @@ func ratchet(netconf *NetConf,containerid string) error {
     return pairid_err
   }
 
+  // Now, we can probably rock out all the 
   logger.Printf("And my pair's container id is: %v",pair_containerid)
 
   // dump_my_meta := spew.Sdump(my_meta)
@@ -488,6 +489,10 @@ func ratchet(netconf *NetConf,containerid string) error {
   // !trace !bang
   // This is how you call up koko.
   // koko.VethCreator("foo","192.168.2.100/24","in1","bar","192.168.2.101/24","in2")
+  koko_err := koko.VethCreator(containerid,my_meta["local_ip"],my_meta["local_ifname"],pair_containerid,my_meta["pair_ip"],my_meta["pair_ifname"])
+  if (koko_err != nil) {
+    return koko_err
+  }
 
   return result
 
