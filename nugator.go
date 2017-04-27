@@ -39,8 +39,10 @@ import (
   "github.com/coreos/etcd/client"
 )
 
+const ALIVE_WAIT_SECONDS = 1
+const ALIVE_WAIT_RETRIES = 120
 const defaultCNIDir = "/var/lib/cni/multus"
-const DEBUG = false
+const DEBUG = true
 const PERFORM_DELETE = false
 
 var etcd_host string
@@ -278,6 +280,32 @@ func isContainerAlive(containername string) bool {
 
 }
 
+func amIAlive(containerid string) bool {
+  isalive := false
+
+  target_key := "/ratchet/" + containerid + "/pod_name"
+  _, err := kapi.Get(context.Background(), target_key, nil)
+  if err != nil {
+
+      // ErrorCodeKeyNotFound = Key not found, that's exactly the one we know is good.
+      // So let's log when it's not that.
+      // Passing along on this.
+      /*
+      if (err != client.ErrorCodeKeyNotFound) {
+        logger.Println(fmt.Errorf("isContainerAlive - possible missing value %s: %v", target_key, err))
+      }
+      */
+
+    } else {
+      // no error? must be there.
+      isalive = true
+    }
+
+  return isalive
+
+}
+
+
 // get the full meta data for a container given the containerid
 // if setalive is true, it also sets an "isalive" flag for the container.
 // is the isalive necessary?
@@ -352,16 +380,37 @@ func ratchet(netconf *NetConf,containerid string) error {
   var result error
 
   if (DEBUG) {
-    dump_netconf := spew.Sdump(netconf)
     koko.TestOne()
-    os.Stderr.WriteString("DOUG !trace ----------\n" + dump_netconf)
-    os.Stderr.WriteString("Before sleep......................")
-    time.Sleep(10 * time.Second)
-    os.Stderr.WriteString("After sleep......................")
+    // dump_netconf := spew.Sdump(netconf)
+    // os.Stderr.WriteString("DOUG !trace ----------\n" + dump_netconf)
+    // os.Stderr.WriteString("Before sleep......................")
+    // time.Sleep(10 * time.Second)
+    // os.Stderr.WriteString("After sleep......................")
   }
 
   // Keep out etcdhost around.
   etcd_host = netconf.Etcd_host
+
+  // Go into a loop determining if we're alive 
+  tries := 0
+  i_am_alive := false
+  for amIAlive(containerid) == false {
+    
+    tries++
+
+    if (DEBUG) {
+      logger.Printf("Looking for containerid: %v (%v retries)\n",containerid,tries);
+    }
+
+    // We either timeout, or, we're alive.
+    if (tries >= ALIVE_WAIT_RETRIES || i_am_alive) {
+      return fmt.Errorf("Timeout: could not find that container is alive in %v tries", tries)
+    }
+    time.Sleep(ALIVE_WAIT_SECONDS * time.Second)
+  }
+
+
+
 
   // Go and pick up results from etcd.
   etcresult := getEtcdMetaData("test123",true)
@@ -372,7 +421,6 @@ func ratchet(netconf *NetConf,containerid string) error {
   os.Stderr.WriteString("The containerid: " + containerid + "\n")
   os.Stderr.WriteString("DOUG !trace etcresult ----------\n" + dump_etcresult)
   os.Stderr.WriteString("DOUG !trace pair_alive ----------" + fmt.Sprintf("%t",pair_alive) + "\n")
- 
 
   // !trace !bang
   // This is how you call up koko.
@@ -392,7 +440,11 @@ func cmdAdd(args *skel.CmdArgs) error {
 
   // Pass a pointer to the NetConf type.
   // logger.Println(reflect.TypeOf(n))
-  ratchet(n,args.ContainerID)
+  rerr := ratchet(n,args.ContainerID)
+  if rerr != nil {
+    return rerr
+  }
+
 
   // for _, delegate := range n.Delegates {
   //   if err := checkDelegate(delegate); err != nil {
