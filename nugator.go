@@ -253,34 +253,37 @@ func clearPlugins(mIdx int, pIdx int, argIfname string, delegates []map[string]i
   return nil
 }
 
-// vEth is a structure to descrive veth interfaces.
-type announceData struct {
-  Pod_name string
-  Pair_name string
-  Public_ip string
-  Local_ip string
-  Local_ifname string
-  Pair_ip string
-  Pair_ifname string
-  Primary string
+func isContainerAlive(containername string) bool {
+  isalive := false
+
+  target_key := "/ratchet/byname/" + containername
+  _, err := kapi.Get(context.Background(), target_key, nil)
+  if err != nil {
+
+      // ErrorCodeKeyNotFound = Key not found, that's exactly the one we know is good.
+      // So let's log when it's not that.
+      // Passing along on this.
+      /*
+      if (err != client.ErrorCodeKeyNotFound) {
+        logger.Println(fmt.Errorf("isContainerAlive - possible missing value %s: %v", target_key, err))
+      }
+      */
+
+    } else {
+      // no error? must be there.
+      isalive = true
+    }
+
+  return isalive
+
 }
 
-/*
-pod_name
-pair_name
-public_ip
-local_ip
-local_ifname
-pair_ip
-pair_ifname
-primary
-*/
-
-func getEtcdData(containerid string, setalive bool) (map[string]string) {
+// get the full meta data for a container given the containerid
+// if setalive is true, it also sets an "isalive" flag for the container.
+// is the isalive necessary?
+func getEtcdMetaData(containerid string, setalive bool) (map[string]string) {
 
   all := make(map[string]string)
-
-  // adata := announceData{}
 
   // All the properties we can have.
   all["pod_name"] = ""
@@ -361,11 +364,14 @@ func ratchet(netconf *NetConf,containerid string) error {
   etcd_host = netconf.Etcd_host
 
   // Go and pick up results from etcd.
-  etcresult := getEtcdData("test123",true)
+  etcresult := getEtcdMetaData("test123",true)
+
+  pair_alive := isContainerAlive(etcresult["pair_name"])
 
   dump_etcresult := spew.Sdump(etcresult)
   os.Stderr.WriteString("The containerid: " + containerid + "\n")
   os.Stderr.WriteString("DOUG !trace etcresult ----------\n" + dump_etcresult)
+  os.Stderr.WriteString("DOUG !trace pair_alive ----------" + fmt.Sprintf("%t",pair_alive) + "\n")
  
 
   // !trace !bang

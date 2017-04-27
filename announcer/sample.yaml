@@ -98,6 +98,7 @@ spec:
           curl -s -L -X PUT $ETCD_URL/ratchet/$container_id/pair_ip -d value="$PAIR_IP";
           curl -s -L -X PUT $ETCD_URL/ratchet/$container_id/pair_ifname -d value="$PAIR_IFNAME";
           curl -s -L -X PUT $ETCD_URL/ratchet/$container_id/primary -d value="$PRIMARY";
+          curl -s -L -X PUT $ETCD_URL/ratchet/byname/$POD_NAME -d value="$container_id";
           echo "----------------------- Getting etcd keys";
           curl -s -L $ETCD_URL/ratchet/$container_id/pod_name;
           curl -s -L $ETCD_URL/ratchet/$container_id/pair_name;
@@ -107,6 +108,7 @@ spec:
           curl -s -L $ETCD_URL/ratchet/$container_id/pair_ip;
           curl -s -L $ETCD_URL/ratchet/$container_id/pair_ifname;
           curl -s -L $ETCD_URL/ratchet/$container_id/primary;
+          curl -s -L $ETCD_URL/ratchet/byname/$POD_NAME;
           while true; do sleep 1; done;
     #       KUBE_TOKEN=$(</var/run/secrets/kubernetes.io/serviceaccount/token) &&
     #       podname=$(curl -sSk -H "Authorization: Bearer $KUBE_TOKEN" https://kubernetes.default.svc.cluster.local/api/v1/namespaces/default/pods | jq '.items[] .metadata.name' | grep -i demo | sed -e 's/\"//g') && 
