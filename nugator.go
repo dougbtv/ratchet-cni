@@ -34,6 +34,7 @@ import (
   "github.com/containernetworking/cni/pkg/types"
   "golang.org/x/net/context"
 
+  dockerclient "github.com/docker/docker/client"
   "github.com/davecgh/go-spew/spew"
   "github.com/redhat-nfvpe/koko"
   "github.com/coreos/etcd/client"
@@ -58,6 +59,7 @@ type NetConf struct {
   CNIDir    string                   `json:"cniDir"`
   Delegate map[string]interface{}    `json:"delegate"`
   Etcd_host string                   `json:"etcd_host"`
+  Use_labels bool                    `json:"use_labels"`
 }
 
 //taken from cni/plugins/meta/flannel/flannel.go
@@ -77,8 +79,8 @@ func loadNetConf(bytes []byte) (*NetConf, error) {
     return nil, fmt.Errorf("failed to load netconf: %v", err)
   }
 
-  dump_netconf := spew.Sdump(netconf)
-  logger.Printf("DOUG !trace netconf ----------%v\n",dump_netconf)
+  // dump_netconf := spew.Sdump(netconf)
+  // logger.Printf("DOUG !trace netconf ----------%v\n",dump_netconf)
 
   if netconf.Delegate == nil {
     return nil, fmt.Errorf(`"delegate" is a required field in config, it should be the config of the main plugin to use`)
@@ -208,6 +210,9 @@ func delegateAdd(podif func() string, argif string, netconf map[string]interface
   if !isMasterplugin(netconf) {
     return true, nil
   }
+
+  // !bang
+  logger.Printf("!trace ------------- stdout? %v",result.String())
 
   return false, result.Print()
 }
@@ -396,6 +401,8 @@ func getEtcdMetaData(containerid string, setalive bool) (map[string]string) {
 
 func ratchet(netconf *NetConf,argif string,containerid string) error {
 
+  var result error
+
   // Alright first few things:
   // 1. Here is where I'd add that we check the k8s api
   //    in order to see if there's a label that makes this applicable to ratcheting.
@@ -405,7 +412,7 @@ func ratchet(netconf *NetConf,argif string,containerid string) error {
   // ------------------------ Delegate "boot network"
   // -- this interface defined the "delegate" section in the config
   // -- defines which interface is used for "regular network access"
-  
+
   if err := checkDelegate(netconf.Delegate); err != nil {
     return fmt.Errorf("Multus: Err in delegate conf: %v", err)
   }
@@ -420,11 +427,42 @@ func ratchet(netconf *NetConf,argif string,containerid string) error {
     // return r
   }
 
+  // ------------------------ Check label
+  ctx := context.Background()
+  cli, err_docker := dockerclient.NewEnvClient()
+  if err_docker != nil {
+    panic(err_docker)
+  }
 
-  var result error
+  cli.UpdateClientVersion("1.24")
+
+  json, _ := cli.ContainerInspect(ctx, containerid)
+
+  logger.Printf("DOUG !trace json >>>>>>>>>>>>>>>>>>>>>----------%v\n",json.Config.Labels)
+
+  if _, use_ratchet := json.Config.Labels["ratchet"]; use_ratchet {
+    logger.Println("USE RATCHET ----------------------->>>>>>>>>>>>>>>")
+  } else {
+    logger.Println("DO NOT USE RATCHET ---------------------<<<<<<<<<<<<<<<")
+    if (netconf.Use_labels) {
+      // When using labels, we're done, now.
+      // So return...
+      logger.Println("USING LABELS HERE ---------------------<<<<<<<<<<<<<<<")
+      return r
+    } else {
+      // When using not using labels (typically for development)
+      // we continue along.
+      logger.Println("NO NO NOT USING LABELS HERE ---------------------<<<<<<<<<<<<<<<")
+    }
+  }
 
   if (DEBUG) {
     koko.TestOne()
+  
+    // Docker inspect.
+    dump_json := spew.Sdump(json)
+    logger.Printf("DOUG !trace json ----------%v\n",dump_json)
+  
     // dump_netconf := spew.Sdump(netconf)
     // os.Stderr.WriteString("DOUG !trace ----------\n" + dump_netconf)
     // os.Stderr.WriteString("Before sleep......................")
@@ -595,7 +633,7 @@ func cmdDel(args *skel.CmdArgs) error {
   }
 
   if (PERFORM_DELETE) {
-    ratchet(in,args.IfName,args.ContainerID)
+    result = ratchet(in,args.IfName,args.ContainerID)
   }
 
   // netconfBytes, err := consumeScratchNetConf(args.ContainerID, in.CNIDir)
@@ -646,10 +684,12 @@ func initEtcd() {
 }
 
 func main() {
-  // logger := 
+  
   if (DEBUG) {
     logger.Println("[LOGGING ENABLED]")
   }
+  
   initEtcd()
+  
   skel.PluginMain(cmdAdd, cmdDel)
 }
