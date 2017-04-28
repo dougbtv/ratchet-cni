@@ -182,39 +182,23 @@ func isMasterplugin(netconf map[string]interface{}) bool {
   return false
 }
 
-func delegateAdd(podif func() string, argif string, netconf map[string]interface{}, onlyMaster bool) (bool, error) {
+func delegateAdd(podif func() string, argif string, netconf map[string]interface{}, onlyMaster bool) (error, *types.Result) {
   netconfBytes, err := json.Marshal(netconf)
   if err != nil {
-    return true, fmt.Errorf("Multus: error serializing multus delegate netconf: %v", err)
+    return fmt.Errorf("Multus: error serializing multus delegate netconf: %v", err), nil
   }
 
-  if isMasterplugin(netconf) != onlyMaster {
-    return true, nil
+  if os.Setenv("CNI_IFNAME", argif) != nil {
+    return fmt.Errorf("Multus: error in setting CNI_IFNAME"), nil
   }
-
-  if !isMasterplugin(netconf) {
-    if os.Setenv("CNI_IFNAME", podif()) != nil {
-      return true, fmt.Errorf("Multus: error in setting CNI_IFNAME")
-    }
-  } else {
-    if os.Setenv("CNI_IFNAME", argif) != nil {
-      return true, fmt.Errorf("Multus: error in setting CNI_IFNAME")
-    }
-  }
-
+  
   result, err := invoke.DelegateAdd(netconf["type"].(string), netconfBytes)
   if err != nil {
-    return true, fmt.Errorf("Multus: error in invoke Delegate add - %q: %v", netconf["type"].(string), err)
+    return fmt.Errorf("Multus: error in invoke Delegate add - %q: %v", netconf["type"].(string), err), nil
   }
-
-  if !isMasterplugin(netconf) {
-    return true, nil
-  }
-
-  // !bang
-  logger.Printf("!trace ------------- stdout? %v",result.String())
-
-  return false, result.Print()
+  
+  return nil, result
+  
 }
 
 func delegateDel(podif func() string, argif string, netconf map[string]interface{}) error {
@@ -398,6 +382,10 @@ func getEtcdMetaData(containerid string, setalive bool) (map[string]string) {
 
 }
 
+func printResults(delresult *types.Result) error {
+  return delresult.Print()
+}
+
 
 func ratchet(netconf *NetConf,argif string,containerid string) error {
 
@@ -420,12 +408,16 @@ func ratchet(netconf *NetConf,argif string,containerid string) error {
   podifName := getifname()
   // var mIndex int
   err, r := delegateAdd(podifName, argif, netconf.Delegate, false)
-  if err != true {
-    // result = r
-    // mIndex = index
-  } else if (err != false) && r != nil {
-    // return r
+  if err != nil {
+    panic(err)
   }
+
+  // if err != true {
+  //   // result = r
+  //   // mIndex = index
+  // } else if (err != false) && r != nil {
+  //   // return r
+  // }
 
   // ------------------------ Check label
   ctx := context.Background()
@@ -448,7 +440,7 @@ func ratchet(netconf *NetConf,argif string,containerid string) error {
       // When using labels, we're done, now.
       // So return...
       logger.Println("USING LABELS HERE ---------------------<<<<<<<<<<<<<<<")
-      return r
+      return printResults(r)
     } else {
       // When using not using labels (typically for development)
       // we continue along.

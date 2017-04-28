@@ -501,3 +501,25 @@ Apparently in the `delegateAdd` method...
 
 Take a little bit of a better look, we can see that the `invoked.DelegateAdd` returns us a type of [Result, which has a Print() method to print json to stdout, GoDoc here](https://godoc.org/github.com/containernetworking/cni/pkg/types#Result)
 
+## Ineligible containers!
+
+Sometimes, the containers shouldsn't be eligible for this treatment, we just delegate off.
+
+Use a `com.ratchet` label set to any value.
+
+```
+[centos@cni scripts]$ cat /tmp/center/Dockerfile 
+FROM centos:centos7
+LABEL "com.ratchet"="true"
+RUN yum install -y traceroute iproute net-tools tcpdump nano vi
+```
+
+And it's in the docker inspect.
+
+```
+[centos@cni scripts]$ docker inspect dreamy_bohr | grep -i ratch
+                "com.ratchet": "true",
+```
+
+Now, how the hell to pull that out?
+
