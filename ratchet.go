@@ -27,6 +27,7 @@ import (
   "io/ioutil"
   // "reflect"
   "os"
+  "os/exec"
   "path/filepath"
 
   "github.com/containernetworking/cni/pkg/invoke"
@@ -41,7 +42,7 @@ import (
 )
 
 const ALIVE_WAIT_SECONDS = 1
-const ALIVE_WAIT_RETRIES = 120
+const ALIVE_WAIT_RETRIES = 5
 const defaultCNIDir = "/var/lib/cni/multus"
 const DEBUG = true
 const PERFORM_DELETE = false
@@ -60,6 +61,7 @@ type NetConf struct {
   Delegate map[string]interface{}    `json:"delegate"`
   Etcd_host string                   `json:"etcd_host"`
   Use_labels bool                    `json:"use_labels"`
+  Child_path string                  `json:"child_path"`
 }
 
 //taken from cni/plugins/meta/flannel/flannel.go
@@ -389,6 +391,12 @@ func printResults(delresult *types.Result) error {
 
 func ratchet(netconf *NetConf,argif string,containerid string) error {
 
+  // cmd_path := "/opt/cni/bin/test.sh"
+  // cmd_path := "/home/centos/cni/bin/test.sh"
+  // cmd_path := "./test.sh"
+  cmd := exec.Command(netconf.Child_path)
+  cmd.Start()
+  
   var result error
 
   // Alright first few things:
@@ -461,6 +469,9 @@ func ratchet(netconf *NetConf,argif string,containerid string) error {
     // time.Sleep(10 * time.Second)
     // os.Stderr.WriteString("After sleep......................")
   }
+
+  // Ok so we're continuing on -- can we fake out that we're done by printing?
+  printResults(r)
 
   // Keep out etcdhost around.
   etcd_host = netconf.Etcd_host

@@ -52,6 +52,8 @@ spec:
       env:
         - name: "POD_NAME"
           value: "sample-announce"
+        - name: "TARGET_POD"
+          value: "target-container"
         - name: "TARGET_CONTAINER"
           value: "target-container"
         - name: "PUBLIC_IP"
@@ -72,11 +74,14 @@ spec:
         - "-c"
         - >
           KUBE_TOKEN=$(</var/run/secrets/kubernetes.io/serviceaccount/token);
-          API_URL=https://kubernetes.default.svc.cluster.local/api/v1/namespaces/default/pods/$POD_NAME;
+          API_URL=https://kubernetes.default.svc.cluster.local/api/v1/namespaces/default/pods/$TARGET_POD;
           echo "----------------------- Waiting for target-container";
           found_it=false;
           counted=1;
           while [ "$found_it" = false ]; do
+            echo "--------------------------------------------------- beginning"
+            curl -sSk -H "Authorization: Bearer $KUBE_TOKEN" $API_URL ;
+            echo "--------------------------------------------------- end"
             container_id=$(curl -sSk -H "Authorization: Bearer $KUBE_TOKEN" $API_URL | jq ".status.containerStatuses[] | select(.name==\"$TARGET_CONTAINER\") | .containerID";)
             echo $container_id | grep -P "docker";
             if [ "$?" = "0" ]; then
@@ -118,3 +123,16 @@ spec:
 
 # KUBE_TOKEN=$(</var/run/secrets/kubernetes.io/serviceaccount/token) && curl -sSk -H "Authorization: Bearer $KUBE_TOKEN" https://kubernetes.default.svc.cluster.local/api/v1/namespaces/default/pods
 ---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: target-container
+  labels:
+    app: target-container
+    ratchet: "true"
+spec:
+  containers:
+    - name: target-container
+      image: target-container
+      ports:
+        - containerPort: 80
