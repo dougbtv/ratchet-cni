@@ -42,7 +42,7 @@ import (
 )
 
 const ALIVE_WAIT_SECONDS = 1
-const ALIVE_WAIT_RETRIES = 15
+const ALIVE_WAIT_RETRIES = 60
 const defaultCNIDir = "/var/lib/cni/multus"
 const DEBUG = true
 const PERFORM_DELETE = false
