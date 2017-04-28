@@ -1,7 +1,7 @@
 #!/bin/bash
 # scp -P 2222 -i ~/.ssh/id_testvms nugator centos@localhost:/home/centos/cni/bin/
 echo "Copying files..."
-rsync -az -e 'ssh -p 2222 -i ~/.ssh/id_testvms' --exclude '/nugator' ./ centos@localhost:/home/centos/gocode/src/nugator
+rsync -az -e 'ssh -p 2222 -i ~/.ssh/id_testvms' --exclude '/ratchet' ./ centos@localhost:/home/centos/gocode/src/ratchet
 echo "Building source..."
-ssh -p 2222 -i ~/.ssh/id_testvms centos@localhost "cd /home/centos/gocode/src/nugator; export GOPATH=/home/centos/gocode/; go build; cp -f nugator /home/centos/cni/bin"
+ssh -p 2222 -i ~/.ssh/id_testvms centos@localhost "cd /home/centos/gocode/src/ratchet; export GOPATH=/home/centos/gocode/; go build; cp -f ratchet /home/centos/cni/bin"
 
