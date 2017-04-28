@@ -552,3 +552,8 @@ ratchet.primary=true
 [centos@cni scripts]$ sudo CNI_PATH=$CNI_PATH ./docker-run-custom.sh --label-file ./primary.label  --rm center sleep 700
 ```
 
+## Child process refactor...
+
+starting to question it.
+
+Let's experiment with a revert.
