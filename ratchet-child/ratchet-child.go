@@ -391,12 +391,6 @@ func printResults(delresult *types.Result) error {
 
 func ratchet(netconf *NetConf,argif string,containerid string) error {
 
-  // cmd_path := "/opt/cni/bin/test.sh"
-  // cmd_path := "/home/centos/cni/bin/test.sh"
-  // cmd_path := "./test.sh"
-  cmd := exec.Command(netconf.Child_path)
-  cmd.Start()
-  
   var result error
 
   // Alright first few things:
@@ -471,7 +465,16 @@ func ratchet(netconf *NetConf,argif string,containerid string) error {
   }
 
   // Ok so we're continuing on -- can we fake out that we're done by printing?
+  // ..not really, the pod is still not ready.
   printResults(r)
+
+  // So we're going to try to spawn a process.
+  // cmd_path := "/opt/cni/bin/test.sh"
+  // cmd_path := "/home/centos/cni/bin/test.sh"
+  // cmd_path := "./test.sh"
+
+  cmd := exec.Command(netconf.Child_path)
+  cmd.Start()
 
   // Keep out etcdhost around.
   etcd_host = netconf.Etcd_host
