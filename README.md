@@ -359,3 +359,145 @@ Yeah, so right now it's not deleting the interfaces, so...
 [centos@cni scripts]$ sudo ip link delete in1
 ```
 
+## So let's run this mutha on kube.
+
+Spinning up my playbooks with a single minion, and using multus. Working on a `customcni` branch.
+
+Let's baseline it and make sure that it's working default, first.
+
+Kick ass, baseline multus appears to work.
+
+## Idea -- what are the multiple configurations?
+
+Does it just do the first one? Or... did multus fail? I had an accident where I used just flannel plain.
+
+Let's try that in the test bed docker only spot, with two plugins. 
+
+Cause I don't give a shizzat if there's "real interfaces created by CNI" right now -- I'm guessing that's for real, I just wanna run my script.
+
+## bashgator test
+
+```
+[root@kubecni-minion-1 cni]# locate bashgator
+/etc/cni/net.d/11-bashgator.conf
+/opt/cni/bin/bashgator
+[root@kubecni-minion-1 cni]# cd /etc/cni/net.d/
+[root@kubecni-minion-1 net.d]# 
+[root@kubecni-minion-1 net.d]# 
+[root@kubecni-minion-1 net.d]# pwd
+/etc/cni/net.d
+[root@kubecni-minion-1 net.d]# ls
+10-multus.conf  11-bashgator.conf
+[root@kubecni-minion-1 net.d]# cat *
+{
+  "name": "multus-demo",
+  "type": "multus",
+  "delegates": [
+    {
+      "type": "macvlan",
+      "master": "eth0",
+      "mode": "bridge",
+      "ipam": {
+        "type": "host-local",
+        "subnet": "192.168.122.0/24",
+        "rangeStart": "192.168.122.200",
+        "rangeEnd": "192.168.122.216",
+        "routes": [
+          { "dst": "0.0.0.0/0" }
+        ],
+        "gateway": "192.168.122.1"
+     }
+    },
+    {
+      "type": "flannel",
+      "masterplugin": true,
+      "delegate": {
+        "isDefaultGateway": true
+      }
+    }
+  ]
+}
+{
+  "name": "bashgator-demo",
+  "type": "bashgator",
+  "delegates": [
+    {
+      "type": "macvlan",
+      "master": "eth0",
+      "mode": "bridge",
+      "ipam": {
+        "type": "host-local",
+        "subnet": "192.168.122.0/24",
+        "rangeStart": "192.168.122.200",
+        "rangeEnd": "192.168.122.216",
+        "routes": [
+          { "dst": "0.0.0.0/0" }
+        ],
+        "gateway": "192.168.122.1"
+     }
+    },
+    {
+      "type": "flannel",
+      "masterplugin": true,
+      "delegate": {
+        "isDefaultGateway": true
+      }
+    }
+  ]
+}
+[root@kubecni-minion-1 net.d]# cat /opt/cni/bin/bashgato
+r#!/bin/bash
+echo "$(date) check 1 2, 1 2" >> /tmp/bashgator.sh
+>&2 echo "This is a test, here is bashgator"
+```
+
+So.... "kind of worked".
+
+That is, I can get it to execute, but... if it fails -- it doesn't execute the next plugin. And... guess what? multus is failing, so bashgator has to be first -- and multus doesn't execute. Or multus is first and bashgator doesn't execute.
+
+So, that's a catch 22.
+
+Let's try with flannel plain config. I'm gonna rebuild the boxen.
+
+```
+Apr 28 00:50:53 kubecni-minion-1 kubelet[11812]: This is a test, here is bashgator
+Apr 28 00:50:53 kubecni-minion-1 kubelet[11812]: E0428 00:50:53.030371   11812 cni.go:257] Error adding network: unexpected end of JSON input
+Apr 28 00:50:53 kubecni-minion-1 kubelet[11812]: E0428 00:50:53.030405   11812 cni.go:211] Error while adding to cni network: unexpected end of JSON input
+Apr 28 00:50:53 kubecni-minion-1 kubelet[11812]: W0428 00:50:53.047766   11812 docker_sandbox.go:263] NetworkPlugin cni failed on the status hook for pod "nginx-k7b0k_default": Unexpected command output nsenter: cannot open /proc/2213/ns/net: No such file or directory
+```
+
+Ok, so... it doesn't really like my script. I had to put it first too.
+
+Next thing to do? I guess we gotta try to make sure skel is in action cause, I'll betchya that does some friendly things.
+
+Let's try a simple version of nugator.
+
+Fails in the same way with the early exit.
+
+Next steps.... ? I think it's time to try one of two things:
+
+* Try to come to completion of the script without an early exit? Unsure what it will change.
+* Try to complete the script in the same way that multus does, delegate to a loopback?
+* Try to run it with multus cni.
+
+## Check this out in multus
+
+This is interesting at least -- it shows that it [outputs some result, apparently](https://github.com/Intel-Corp/multus-cni/blob/master/multus/multus.go#L179-L188).
+
+Apparently in the `delegateAdd` method...
+
+```golang
+  result, err := invoke.DelegateAdd(netconf["type"].(string), netconfBytes)
+  if err != nil {
+    return true, fmt.Errorf("Multus: error in invoke Delegate add - %q: %v", netconf["type"].(string), err)
+  }
+
+  if !isMasterplugin(netconf) {
+    return true, nil
+  }
+
+  return false, result.Print()
+```
+
+Take a little bit of a better look, we can see that the `invoked.DelegateAdd` returns us a type of [Result, which has a Print() method to print json to stdout, GoDoc here](https://godoc.org/github.com/containernetworking/cni/pkg/types#Result)
+

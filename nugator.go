@@ -34,7 +34,7 @@ import (
   "github.com/containernetworking/cni/pkg/types"
   "golang.org/x/net/context"
 
-  // "github.com/davecgh/go-spew/spew"
+  "github.com/davecgh/go-spew/spew"
   "github.com/redhat-nfvpe/koko"
   "github.com/coreos/etcd/client"
 )
@@ -56,7 +56,7 @@ var masterpluginEnabled bool
 type NetConf struct {
   types.NetConf
   CNIDir    string                   `json:"cniDir"`
-  Delegates []map[string]interface{} `json:"delegates"`
+  Delegate map[string]interface{}    `json:"delegate"`
   Etcd_host string                   `json:"etcd_host"`
 }
 
@@ -77,8 +77,11 @@ func loadNetConf(bytes []byte) (*NetConf, error) {
     return nil, fmt.Errorf("failed to load netconf: %v", err)
   }
 
-  if netconf.Delegates == nil {
-    return nil, fmt.Errorf(`"delegates" is must, refer README.md`)
+  dump_netconf := spew.Sdump(netconf)
+  logger.Printf("DOUG !trace netconf ----------%v\n",dump_netconf)
+
+  if netconf.Delegate == nil {
+    return nil, fmt.Errorf(`"delegate" is a required field in config, it should be the config of the main plugin to use`)
   }
 
   if netconf.CNIDir == "" {
@@ -391,7 +394,32 @@ func getEtcdMetaData(containerid string, setalive bool) (map[string]string) {
 }
 
 
-func ratchet(netconf *NetConf,containerid string) error {
+func ratchet(netconf *NetConf,argif string,containerid string) error {
+
+  // Alright first few things:
+  // 1. Here is where I'd add that we check the k8s api
+  //    in order to see if there's a label that makes this applicable to ratcheting.
+  //    other wise it'd just get the delegate.
+  //    let's just delegate everything first, though.    
+
+  // ------------------------ Delegate "boot network"
+  // -- this interface defined the "delegate" section in the config
+  // -- defines which interface is used for "regular network access"
+  
+  if err := checkDelegate(netconf.Delegate); err != nil {
+    return fmt.Errorf("Multus: Err in delegate conf: %v", err)
+  }
+
+  podifName := getifname()
+  // var mIndex int
+  err, r := delegateAdd(podifName, argif, netconf.Delegate, false)
+  if err != true {
+    // result = r
+    // mIndex = index
+  } else if (err != false) && r != nil {
+    // return r
+  }
+
 
   var result error
 
@@ -508,7 +536,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 
   // Pass a pointer to the NetConf type.
   // logger.Println(reflect.TypeOf(n))
-  rerr := ratchet(n,args.ContainerID)
+  rerr := ratchet(n,args.IfName,args.ContainerID)
   if rerr != nil {
     return rerr
   }
@@ -567,7 +595,7 @@ func cmdDel(args *skel.CmdArgs) error {
   }
 
   if (PERFORM_DELETE) {
-    ratchet(in,args.ContainerID)
+    ratchet(in,args.IfName,args.ContainerID)
   }
 
   // netconfBytes, err := consumeScratchNetConf(args.ContainerID, in.CNIDir)
