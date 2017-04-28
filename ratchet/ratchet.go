@@ -37,7 +37,7 @@ import (
 
   dockerclient "github.com/docker/docker/client"
   "github.com/davecgh/go-spew/spew"
-  "github.com/redhat-nfvpe/koko"
+  // "github.com/redhat-nfvpe/koko"
   "github.com/coreos/etcd/client"
 )
 
@@ -451,8 +451,7 @@ func ratchet(netconf *NetConf,argif string,containerid string) error {
   }
 
   if (DEBUG) {
-    koko.TestOne()
-  
+    
     // Docker inspect.
     dump_json := spew.Sdump(json)
     logger.Printf("DOUG !trace json ----------%v\n",dump_json)
@@ -478,96 +477,6 @@ func ratchet(netconf *NetConf,argif string,containerid string) error {
   // logger.Printf("executing path composite: %v",exec_string);
   cmd := exec.Command(netconf.Child_path,argif,containerid,netconf.Etcd_host)
   cmd.Start()
-
-  // Keep out etcdhost around.
-  etcd_host = netconf.Etcd_host
-
-  // Go into a loop determining if we're alive 
-  tries := 0
-  i_am_alive := false
-  for amIAlive(containerid) == false {
-    
-    tries++
-
-    if (DEBUG) {
-      logger.Printf("Am I alive? containerid: %v (%v retries)\n",containerid,tries);
-    }
-
-    // We either timeout, or, we're alive.
-    if (tries >= ALIVE_WAIT_RETRIES || i_am_alive) {
-      return fmt.Errorf("Timeout: could not find this container is alive via metadata in %v tries", tries)
-    }
-
-    // Wait for however long.
-    time.Sleep(ALIVE_WAIT_SECONDS * time.Second)
-  }
-
-  // If it's determined that we're alive, now we can see if we're primary.
-  // If we're not primary, we can just exit right now.
-  // Cause the primary side will add to this pair.
-
-  // Go and pick up metadata about me from etcd.
-  my_meta := getEtcdMetaData(containerid,true)
-
-  if (my_meta["primary"] != "true") {
-    // Ok, we're not primary. So... time to exit.
-    if (DEBUG) {
-      logger.Printf("Normal termination, this container is not primary (name: %v, containerid: %v, primary: %v)",my_meta["pod_name"],containerid,my_meta["primary"]);
-    }
-
-    return nil
-  }
-
-  // Check to see there's a valid pair name.
-  if (len(my_meta["pair_name"]) <= 1) {
-    // That's not good.
-    return fmt.Errorf("Pair name appears to be invalid: %v", my_meta["pair_name"])
-  }
-
-  // Now we want to check and see if the pair container is alive.
-  // So it's time to go into a loop and do that.
-  // if the pair container is alive -- bada bing, we can execute koko.
-
-  for isContainerAlive(my_meta["pair_name"]) == false {
-    
-    tries++
-
-    if (DEBUG) {
-      logger.Printf("Is pair alive? pair_name: %v (%v retries)\n",my_meta["pair_name"],tries);
-    }
-
-    // We either timeout, or, we're alive.
-    if (tries >= ALIVE_WAIT_RETRIES || i_am_alive) {
-      return fmt.Errorf("Timeout: could not find that pair container is alive via metadata in %v tries", tries)
-    }
-
-    // Wait for however long.
-    time.Sleep(ALIVE_WAIT_SECONDS * time.Second)
-
-  }
-
-  // Alright, given that... we should have a valid pair.
-  // So let's pick up the pair container id.
-  pairid_err, pair_containerid := getContainerIDByName(my_meta["pair_name"])
-  if (pairid_err != nil) {
-    return pairid_err
-  }
-
-  // Now, we can probably rock out all the 
-  logger.Printf("And my pair's container id is: %v",pair_containerid)
-
-  // dump_my_meta := spew.Sdump(my_meta)
-  // os.Stderr.WriteString("The containerid: " + containerid + "\n")
-  // os.Stderr.WriteString("DOUG !trace my_meta ----------\n" + dump_my_meta)
-  // os.Stderr.WriteString("DOUG !trace pair_alive ----------" + fmt.Sprintf("%t",pair_alive) + "\n")
-
-  // !trace !bang
-  // This is how you call up koko.
-  // koko.VethCreator("foo","192.168.2.100/24","in1","bar","192.168.2.101/24","in2")
-  koko_err := koko.VethCreator(containerid,my_meta["local_ip"],my_meta["local_ifname"],pair_containerid,my_meta["pair_ip"],my_meta["pair_ifname"])
-  if (koko_err != nil) {
-    return koko_err
-  }
 
   return result
 
