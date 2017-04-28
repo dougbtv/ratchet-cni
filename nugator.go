@@ -14,8 +14,8 @@
 
 // This is a fork of Multus-CNI, which is a fork of Flannel
 // This is a fork of a spoon.
-// This is Doug learning how to create a CNI plugin.
-// nugator is latin for "pipsqueak"
+// This is an implementation of Koko as a CNI plugin.
+// Original Author @dougbtv
 
 package main
 
