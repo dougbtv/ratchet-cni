@@ -473,7 +473,10 @@ func ratchet(netconf *NetConf,argif string,containerid string) error {
   // cmd_path := "/home/centos/cni/bin/test.sh"
   // cmd_path := "./test.sh"
 
-  cmd := exec.Command(netconf.Child_path)
+  logger.Printf("executing path: %v / argif: %v / containerID: %v / etcd_host: %v",netconf.Child_path,argif,containerid,netconf.Etcd_host);
+  exec_string := netconf.Child_path + " " + argif + " " + containerid + " " + netconf.Etcd_host
+  logger.Printf("executing path composite: %v",exec_string);
+  cmd := exec.Command(exec_string)
   cmd.Start()
 
   // Keep out etcdhost around.
@@ -691,6 +694,7 @@ func initEtcd() {
 
 func main() {
   
+
   if (DEBUG) {
     logger.Println("[LOGGING ENABLED]")
   }

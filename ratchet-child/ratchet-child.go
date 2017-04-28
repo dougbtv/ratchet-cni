@@ -31,13 +31,13 @@ import (
   "path/filepath"
 
   "github.com/containernetworking/cni/pkg/invoke"
-  "github.com/containernetworking/cni/pkg/skel"
+  // "github.com/containernetworking/cni/pkg/skel"
   "github.com/containernetworking/cni/pkg/types"
   "golang.org/x/net/context"
 
-  dockerclient "github.com/docker/docker/client"
-  "github.com/davecgh/go-spew/spew"
-  "github.com/redhat-nfvpe/koko"
+  // dockerclient "github.com/docker/docker/client"
+  // "github.com/davecgh/go-spew/spew"
+  // "github.com/redhat-nfvpe/koko"
   "github.com/coreos/etcd/client"
 )
 
@@ -47,11 +47,7 @@ const defaultCNIDir = "/var/lib/cni/multus"
 const DEBUG = true
 const PERFORM_DELETE = false
 
-var etcd_host string
-
 var kapi client.KeysAPI
-
-var logger = log.New(os.Stderr, "", 0)
 
 var masterpluginEnabled bool
 
@@ -389,9 +385,15 @@ func printResults(delresult *types.Result) error {
 }
 
 
-func ratchet(netconf *NetConf,argif string,containerid string) error {
+func ratchet(argif string,containerid string) error {
+
+  os.Stderr.WriteString("!trace alive The containerid: " + containerid + "\n")
 
   var result error
+
+
+
+  /*
 
   // Alright first few things:
   // 1. Here is where I'd add that we check the k8s api
@@ -565,114 +567,24 @@ func ratchet(netconf *NetConf,argif string,containerid string) error {
   if (koko_err != nil) {
     return koko_err
   }
+  
+  */
 
   return result
 
 }
 
-func cmdAdd(args *skel.CmdArgs) error {
+func logger(input string) {
 
-  var result error
-  n, err := loadNetConf(args.StdinData)
-  if err != nil {
-    return err
-  }
-
-  // Pass a pointer to the NetConf type.
-  // logger.Println(reflect.TypeOf(n))
-  rerr := ratchet(n,args.IfName,args.ContainerID)
-  if rerr != nil {
-    return rerr
-  }
-
-
-  // for _, delegate := range n.Delegates {
-  //   if err := checkDelegate(delegate); err != nil {
-  //     return fmt.Errorf("Multus: Err in delegate conf: %v", err)
-  //   }
-  // }
-
-  // // dump_args := spew.Sdump(args)
-  // // os.Stderr.WriteString("DOUG !trace ----------\n" + dump_args)
-
-
-  // if err := saveDelegates(args.ContainerID, n.CNIDir, n.Delegates); err != nil {
-  //   return fmt.Errorf("Multus: Err in saving the delegates: %v", err)
-  // }
-
-  // podifName := getifname()
-  // var mIndex int
-  // for index, delegate := range n.Delegates {
-  //   err, r := delegateAdd(podifName, args.IfName, delegate, true)
-  //   if err != true {
-  //     result = r
-  //     mIndex = index
-  //   } else if (err != false) && r != nil {
-  //     return r
-  //   }
-  // }
-
-  // for index, delegate := range n.Delegates {
-  //   err, r := delegateAdd(podifName, args.IfName, delegate, false)
-  //   if err != true {
-  //     result = r
-  //   } else if (err != false) && r != nil {
-  //     perr := clearPlugins(mIndex, index, args.IfName, n.Delegates)
-  //     if perr != nil {
-  //       return perr
-  //     }
-  //     return r
-  //   }
-  // }
-
-  // return result
-
-  return result
+  // exec_command := 
+  // os.Stderr.WriteString("!trace alive The containerid: |" + exec_command + "|||\n")
+  cmd := exec.Command("/bin/bash", "-c", "echo \"ratchet-child: " + input + "\" | systemd-cat")
+  cmd.Start()
 
 }
 
-func cmdDel(args *skel.CmdArgs) error {
-  var result error
-  in, err := loadNetConf(args.StdinData)
-  if err != nil {
-    return err
-  }
 
-  if (PERFORM_DELETE) {
-    result = ratchet(in,args.IfName,args.ContainerID)
-  }
-
-  // netconfBytes, err := consumeScratchNetConf(args.ContainerID, in.CNIDir)
-  // if err != nil {
-  //   return fmt.Errorf("Multus: Err in  reading the delegates: %v", err)
-  // }
-
-  // var Delegates []map[string]interface{}
-  // if err := json.Unmarshal(netconfBytes, &Delegates); err != nil {
-  //   return fmt.Errorf("Multus: failed to load netconf: %v", err)
-  // }
-
-  // podifName := getifname()
-  // for _, delegate := range Delegates {
-  //   r := delegateDel(podifName, args.IfName, delegate)
-  //   if r != nil {
-  //     return r
-  //   }
-  //   result = r
-  // }
-
-  return result
-}
-
-func versionInfo(args *skel.CmdArgs) error {
-
-  var result error
-  fmt.Fprintln(os.Stderr, "Version v0.0.0")
-  return result
-
-}
-
-func initEtcd() {
+func initEtcd(etcd_host string) {
 
   // Make a connection to etcd. Then we reuse the "kapi"
 
@@ -691,11 +603,16 @@ func initEtcd() {
 
 func main() {
   
+  // arg := os.Args[3]
+
+  initEtcd(os.Args[3])
+
   if (DEBUG) {
-    logger.Println("[LOGGING ENABLED]")
+    logger("[LOGGING ENABLED]")
+    logger(fmt.Sprintf("Interface: %v",os.Args[1]))
+    logger(fmt.Sprintf("ContainerID: %v",os.Args[2]))
   }
+
+  ratchet(os.Args[1],os.Args[2])
   
-  initEtcd()
-  
-  skel.PluginMain(cmdAdd, cmdDel)
 }
