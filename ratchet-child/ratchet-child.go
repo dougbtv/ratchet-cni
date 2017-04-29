@@ -314,7 +314,7 @@ func ratchet(argif string,containerid string, linki LinkInfo) error {
   // koko.VethCreator("foo","192.168.2.100/24","in1","bar","192.168.2.101/24","in2")
 
   // What about a healthy delay?
-  logger("Pre koko-delay, " + DELAY_KOKO_SECONDS + " SECONDS")
+  logger(fmt.Sprintf("Pre koko-delay, %v SECONDS",DELAY_KOKO_SECONDS))
   time.Sleep(DELAY_KOKO_SECONDS * time.Second)
 
 

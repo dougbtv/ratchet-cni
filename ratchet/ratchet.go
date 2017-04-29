@@ -55,11 +55,12 @@ var masterpluginEnabled bool
 
 type NetConf struct {
   types.NetConf
-  CNIDir    string                   `json:"cniDir"`
-  Delegate map[string]interface{}    `json:"delegate"`
-  Etcd_host string                   `json:"etcd_host"`
-  Use_labels bool                    `json:"use_labels"`
-  Child_path string                  `json:"child_path"`
+  CNIDir    string                    `json:"cniDir"`
+  Delegate map[string]interface{}     `json:"delegate"`
+  Etcd_host string                    `json:"etcd_host"`
+  Use_labels bool                     `json:"use_labels"`
+  Child_path string                   `json:"child_path"`
+  Boot_network map[string]interface{} `json:"boot_network"`
 }
 
 type LinkInfo struct {
@@ -387,23 +388,19 @@ func ratchet(netconf *NetConf,argif string,containerid string) error {
   // -- this interface defined the "delegate" section in the config
   // -- defines which interface is used for "regular network access"
 
+  // --------------------- Setup delegate.
+
+  // This is a weak check, fwiw.
   if err := checkDelegate(netconf.Delegate); err != nil {
-    return fmt.Errorf("Multus: Err in delegate conf: %v", err)
+    return fmt.Errorf("Ratchet delegate: Err in delegate conf: %v", err)
+  }
+
+  if err := checkDelegate(netconf.Boot_network); err != nil {
+    return fmt.Errorf("Ratchet Boot_network: Err in delegate conf: %v", err)
   }
 
   podifName := getifname()
-  // var mIndex int
-  err, r := delegateAdd(podifName, argif, netconf.Delegate, false)
-  if err != nil {
-    panic(err)
-  }
-
-  // if err != true {
-  //   // result = r
-  //   // mIndex = index
-  // } else if (err != false) && r != nil {
-  //   // return r
-  // }
+  
 
   // ------------------------ Check label
   ctx := context.Background()
@@ -418,22 +415,35 @@ func ratchet(netconf *NetConf,argif string,containerid string) error {
 
   logger.Printf("DOUG !trace json >>>>>>>>>>>>>>>>>>>>>----------%v\n",json.Config.Labels)
 
-  // Determine container eligibility.
+  // ------------------------ Determine container eligibility.
+
+  var err error
+  var r *types.Result
 
   if _, use_ratchet := json.Config.Labels["ratchet"]; use_ratchet {
+
     logger.Println("USE RATCHET ----------------------->>>>>>>>>>>>>>>")
-  } else {
-    logger.Println("DO NOT USE RATCHET ---------------------<<<<<<<<<<<<<<<")
-    if (netconf.Use_labels) {
-      // When using labels, we're done, now.
-      // So return...
-      logger.Println("USING LABELS HERE ---------------------<<<<<<<<<<<<<<<")
-      return printResults(r)
-    } else {
-      // When using not using labels (typically for development)
-      // we continue along.
-      logger.Println("NO NO NOT USING LABELS HERE ---------------------<<<<<<<<<<<<<<<")
+    // We want to use the ratchet "boot_network"
+    err, r = delegateAdd(podifName, argif, netconf.Boot_network, false)
+    if err != nil {
+      logger.Printf("ratchet delegateAdd boot_network error ----------%v",err)
+      return err
     }
+
+  } else {
+
+    // We used to switch here depending on the use_labels flag, which is seemingly obsolete.
+    // But, now, we just use the delegate.
+    // var mIndex int
+    logger.Println("DO NOT USE RATCHET (passthrough)----------------------->>>>>>>>>>>>>>>")
+    err, r = delegateAdd(podifName, argif, netconf.Delegate, false)
+    if err != nil {
+      logger.Printf("ratchet delegateAdd passthrough error ----------%v",err)
+      return err
+    }
+
+    return printResults(r)
+    
   }
 
   // If you get to this point -- you're eligible for treatment under ratchet.
