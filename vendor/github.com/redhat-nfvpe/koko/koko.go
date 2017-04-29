@@ -216,16 +216,16 @@ func makeVxLan(veth1 vEth, vxlan vxLan) {
 
 	err := addVxLanInterface(vxlan, veth1.linkName)
 	if err != nil {
-		logger("makeVeth b:" + fmt.Sprintf("vxlan add failed: %v", err))
+		logger("makeVxlan b:" + fmt.Sprintf("vxlan add failed: %v", err))
 	}
 
 	link, err2 := netlink.LinkByName(veth1.linkName)
 	if err2 != nil {
-		logger("makeVeth c:" + fmt.Sprintf("Cannot get %s: %v", veth1.linkName, err))
+		logger("makeVxlan c:" + fmt.Sprintf("Cannot get %s: %v", veth1.linkName, err))
 	}
 	err = veth1.setVethLink(link)
 	if err != nil {
-		logger("makeVeth d:" + fmt.Sprintf("Cannot add IPaddr/netns failed: %v", err))
+		logger("makeVxlan d:" + fmt.Sprintf("Cannot add IPaddr/netns failed: %v", err))
 	}
 }
 
@@ -337,6 +337,38 @@ func logger(input string) {
 
 }
 
+func getProcessNamespace(containerid string) (error,string) {
+
+	// Pick up the pid from docker inspect.
+	// Template the path to that
+
+	cli, err := client.NewEnvClient()
+	if err != nil {
+		err = fmt.Errorf("failed to do NewEnvClient: %v", err)
+		return err, ""
+	}
+
+	cli.UpdateClientVersion("1.24")
+
+	json, err := cli.ContainerInspect(context.Background(), containerid)
+	if err != nil {
+		err = fmt.Errorf("failed to get container info: %v", err)
+		return err, ""
+	}
+
+	/*
+
+	This would be nice to check, but, I'm not sure what to look for.
+
+	if json.State.Pid == nil {
+		err = fmt.Errorf("failed to get container info: %v", err)
+		return err, ""
+	}
+	*/
+
+	return nil, "/proc/" + strconv.Itoa(json.State.Pid) + "/ns/net"
+
+}
 
 func VethCreator (local_container string, local_ipnetmask string, local_ifname string, pair_container string, pair_ipnetmask string, pair_ifname string) (err error) {
 
@@ -347,7 +379,12 @@ func VethCreator (local_container string, local_ipnetmask string, local_ifname s
 
 	// Get the pieces for vethA ----------------------------------
 
-	vethA.nsName, err = getDockerContainerNS(local_container)
+	err, vethA.nsName = getProcessNamespace(local_container)
+	logger(fmt.Sprintf("vethA.nsName: %v",vethA.nsName))
+	if err != nil {
+		err = fmt.Errorf("Failure to get docker container ns (vetha) -- %v: %v", pair_container, err)
+		return err
+	}
 
 	ip, mask, err := net.ParseCIDR(local_ipnetmask)
 	if err != nil {
@@ -360,25 +397,20 @@ func VethCreator (local_container string, local_ipnetmask string, local_ifname s
 	vethA.ipAddr.Mask = mask.Mask
 	vethA.withIPAddr = true
 
-	logger("!trace b")
-
 	// Get the pieces for vethB ----------------------------------
 
-	vethB.nsName, err = getDockerContainerNS(pair_container)
+	err, vethB.nsName = getProcessNamespace(pair_container)
+	logger(fmt.Sprintf("vethB.nsName: %v",vethB.nsName))
 	if err != nil {
-		err = fmt.Errorf("Failure to get docker container ns -- %v: %v", pair_container, err)
+		err = fmt.Errorf("Failure to get docker container ns (vethb) -- %v: %v", pair_container, err)
 		return err
 	}
-
-	logger("!trace c")
 
 	ip, mask, err2 := net.ParseCIDR(pair_ipnetmask)
 	if err2 != nil {
 		err2 = fmt.Errorf("failed to parse IP addr %s: %v", pair_ipnetmask, err2)
 		return err2
 	}
-
-	logger("!trace d")
 
 
 	vethB.linkName = pair_ifname
