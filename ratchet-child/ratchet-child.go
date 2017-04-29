@@ -51,6 +51,19 @@ var kapi client.KeysAPI
 
 var masterpluginEnabled bool
 
+type LinkInfo struct {
+  Pod_name string
+  Target_pod string
+  Target_container string
+  Public_ip string
+  Local_ip string
+  Local_ifname string
+  Pair_name string
+  Pair_ip string
+  Pair_ifname string
+  Primary string
+}
+
 func isContainerAlive(containername string) bool {
   isalive := false
 
@@ -186,7 +199,7 @@ func getEtcdMetaData(containerid string, setalive bool) (map[string]string) {
 
 }
 
-func ratchet(argif string,containerid string) error {
+func ratchet(argif string,containerid string, linki LinkInfo) error {
 
   os.Stderr.WriteString("!trace alive The containerid: " + containerid + "\n")
 
@@ -316,13 +329,22 @@ func main() {
 
   initEtcd(os.Args[3])
 
+  for idx,element := range os.Args {
+    logger(fmt.Sprintf("arg[%v]: %v",idx,element))
+  }
+
+
+  os.Exit(1)
+
   if (DEBUG) {
     logger("[LOGGING ENABLED]")
     logger(fmt.Sprintf("Interface: %v",os.Args[1]))
     logger(fmt.Sprintf("ContainerID: %v",os.Args[2]))
   }
 
-  err := ratchet(os.Args[1],os.Args[2])
+  linki := LinkInfo{}
+
+  err := ratchet(os.Args[1],os.Args[2],linki)
   if (err != nil) {
     logger(fmt.Sprintf("%v",err))
   }

@@ -155,6 +155,7 @@ metadata:
   labels:
     app: pair-pod
     ratchet: "true"
+    ratchet.pod_name: pair-pod
     ratchet.primary: "false"
 spec:
   containers:

@@ -27,6 +27,7 @@ import (
   "io/ioutil"
   // "reflect"
   "os"
+  "os/exec"
   "path/filepath"
 
   "github.com/containernetworking/cni/pkg/invoke"
@@ -58,6 +59,7 @@ type NetConf struct {
   Delegate map[string]interface{}    `json:"delegate"`
   Etcd_host string                   `json:"etcd_host"`
   Use_labels bool                    `json:"use_labels"`
+  Child_path string                  `json:"child_path"`
 }
 
 type LinkInfo struct {
@@ -456,6 +458,8 @@ func ratchet(netconf *NetConf,argif string,containerid string) error {
 
   logger.Printf("DOUG !trace json >>>>>>>>>>>>>>>>>>>>>----------%v\n",json.Config.Labels)
 
+  // Determine container eligibility.
+
   if _, use_ratchet := json.Config.Labels["ratchet"]; use_ratchet {
     logger.Println("USE RATCHET ----------------------->>>>>>>>>>>>>>>")
   } else {
@@ -472,9 +476,7 @@ func ratchet(netconf *NetConf,argif string,containerid string) error {
     }
   }
 
-  // We will use etcd now, so it's time to initialize it.
-  initEtcd(netconf.Etcd_host)
-
+  // If you get to this point -- you're eligible for treatment under ratchet.
 
   // Populate all the possible link info.
 
@@ -493,9 +495,35 @@ func ratchet(netconf *NetConf,argif string,containerid string) error {
   dump_linki := spew.Sdump(linki)
   logger.Printf("DOUG !trace linki ----------%v\n",dump_linki)
 
-  // Docker inspect.
-  dump_json := spew.Sdump(json)
-  logger.Printf("DOUG !trace json ----------%v\n",dump_json)
+  // Spawn external process.
+  // ...pass tons of link info along with some basics.
+
+  // logger.Printf("executing path: %v / argif: %v / containerID: %v / etcd_host: %v",netconf.Child_path,argif,containerid,netconf.Etcd_host);
+  // exec_string := netconf.Child_path + " " + argif + " " + containerid + " " + netconf.Etcd_host
+  // logger.Printf("executing path composite: %v",exec_string);
+  cmd := exec.Command(
+    netconf.Child_path,       // 0
+    argif,                    // 1
+    containerid,
+    netconf.Etcd_host,
+    linki.Pod_name,
+    linki.Target_pod,
+    linki.Target_container,
+    linki.Public_ip,
+    linki.Local_ip,
+    linki.Local_ifname,
+    linki.Pair_name,
+    linki.Pair_ip,
+    linki.Pair_ifname,
+    linki.Primary,
+  )
+  cmd.Start()
+
+  // We will use etcd now, so it's time to initialize it.
+  initEtcd(netconf.Etcd_host)
+
+  // dump_json := spew.Sdump(json)
+  // logger.Printf("DOUG !trace json ----------%v\n",dump_json)
 
   // We no longer care if we're alive anymore. 
   // If this is up, we can assume the infra container is good to go.
