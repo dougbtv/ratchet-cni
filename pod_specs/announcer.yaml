@@ -143,10 +143,9 @@ metadata:
 spec:
   containers:
     - name: primary-pod
-      image: centos:centos7
+      image: dougbtv/centos-network
       command: ["/bin/bash"]
       args: ["-c", "while true; do sleep 10; done"]
-      image: centos:centos7
 ---
 apiVersion: v1
 kind: Pod
@@ -160,7 +159,6 @@ metadata:
 spec:
   containers:
     - name: pair-pod
-      image: centos:centos7
+      image: dougbtv/centos-network
       command: ["/bin/bash"]
       args: ["-c", "while true; do sleep 10; done"]
-      image: centos:centos7
