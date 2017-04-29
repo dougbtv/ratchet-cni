@@ -37,7 +37,7 @@ import (
 
   dockerclient "github.com/docker/docker/client"
   "github.com/davecgh/go-spew/spew"
-  "github.com/redhat-nfvpe/koko"
+  // "github.com/redhat-nfvpe/koko"
   "github.com/coreos/etcd/client"
 )
 
@@ -260,29 +260,6 @@ func clearPlugins(mIdx int, pIdx int, argIfname string, delegates []map[string]i
   return nil
 }
 
-func isPairContainerAlive(podname string) string {
-  
-  target_key := "/ratchet/association/" + podname
-  resp_containerid, err := kapi.Get(context.Background(), target_key, nil)
-  if err != nil {
-
-      // ErrorCodeKeyNotFound = Key not found, that's exactly the one we know is good.
-      // So let's log when it's not that.
-      // Passing along on this.
-      /*
-      if (err != client.ErrorCodeKeyNotFound) {
-        logger.Println(fmt.Errorf("isPairContainerAlive - possible missing value %s: %v", target_key, err))
-      }
-      */
-
-    } else {
-      // no error? must be there.
-      return resp_containerid.Node.Value;
-    }
-
-  return ""
-
-}
 
 func getContainerIDByName(containername string) (error, string) {
   
@@ -398,23 +375,6 @@ func printResults(delresult *types.Result) error {
   return delresult.Print()
 }
 
-func associateIDEtcd (containerid string,podname string) error {
-
-  // set "/foo" key with "bar" value
-  // log.Print("Setting '/foo' key with 'bar' value")
-  _, err := kapi.Set(context.Background(), "/ratchet/association/" + podname, containerid, nil)
-  if err != nil {
-    log.Fatal(err)
-    return err
-  } else {
-    // print common key info
-    // log.Printf("Set is done. Metadata is %q\n", resp)
-  }
-
-  return nil
-
-}
-
 func ratchet(netconf *NetConf,argif string,containerid string) error {
 
   // Alright first few things:
@@ -519,94 +479,7 @@ func ratchet(netconf *NetConf,argif string,containerid string) error {
   )
   cmd.Start()
 
-  // We will use etcd now, so it's time to initialize it.
-  initEtcd(netconf.Etcd_host)
-
-  // dump_json := spew.Sdump(json)
-  // logger.Printf("DOUG !trace json ----------%v\n",dump_json)
-
-  // We no longer care if we're alive anymore. 
-  // If this is up, we can assume the infra container is good to go.
-  // So all we need to do is associate our containerid with our name.
-  associateIDEtcd(containerid,linki.Pod_name)
-
-
-  // If it's determined that we're alive, now we can see if we're primary.
-  // If we're not primary, we can just exit right now.
-  // Cause the primary side will add to this pair.
-
-  if (linki.Primary != "true") {
-    // Ok, we're not primary. So... time to exit.
-    if (DEBUG) {
-      logger.Printf("Normal termination, this container is not primary (name: %v, containerid: %v, primary: %v)",linki.Pod_name,containerid,linki.Primary);
-    }
-
-    return nil
-  }
-
-  // Check to see there's a valid pair name.
-  if (len(linki.Pair_name) <= 1) {
-    // That's not good.
-    return fmt.Errorf("Pair name appears to be invalid: %v", linki.Pair_name)
-  }
-
-  // Now we want to check and see if the pair container is alive.
-  // So it's time to go into a loop and do that.
-  // if the pair container is alive -- bada bing, we can execute koko.
-
-  var pair_containerid string
-  tries := 0
-
-  for {
-    
-    pair_containerid = isPairContainerAlive(linki.Pair_name)
-
-    if (len(pair_containerid) >= 1) {
-      // We found it.
-      break;
-    }
-
-    tries++
-
-    if (DEBUG) {
-      logger.Printf("Is pair alive? pair_name: %v (%v retries)\n",linki.Pair_name,tries);
-    }
-
-    // We either timeout, or, we're alive.
-    if (tries >= ALIVE_WAIT_RETRIES) {
-      return fmt.Errorf("Timeout: could not find that pair container is alive via metadata in %v tries", tries)
-    }
-
-    // Wait for however long.
-    time.Sleep(ALIVE_WAIT_SECONDS * time.Second)
-
-  }
-
-  // Now, we can probably rock out all the 
-  logger.Printf("And my pair's container id is: %v",pair_containerid)
-
-  // dump_my_meta := spew.Sdump(my_meta)
-  // os.Stderr.WriteString("The containerid: " + containerid + "\n")
-  // os.Stderr.WriteString("DOUG !trace my_meta ----------\n" + dump_my_meta)
-  // os.Stderr.WriteString("DOUG !trace pair_alive ----------" + fmt.Sprintf("%t",pair_alive) + "\n")
-
-  // !trace !bang
-  // This is how you call up koko.
-  // koko.VethCreator("foo","192.168.2.100/24","in1","bar","192.168.2.101/24","in2")
-  koko_err := koko.VethCreator(
-    containerid,
-    linki.Local_ip + "/24",
-    linki.Local_ifname,
-    pair_containerid,
-    linki.Pair_ip + "/24",
-    linki.Pair_ifname,
-  )
-
-  if (koko_err != nil) {
-    return koko_err
-  }
-
-  return nil
+  return printResults(r)
 
 }
 
