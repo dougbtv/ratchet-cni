@@ -27,6 +27,7 @@ import (
   "io/ioutil"
   // "reflect"
   "os"
+  "os/exec"
   "path/filepath"
 
   "github.com/containernetworking/cni/pkg/invoke"
@@ -36,7 +37,7 @@ import (
 
   dockerclient "github.com/docker/docker/client"
   "github.com/davecgh/go-spew/spew"
-  "github.com/redhat-nfvpe/koko"
+  // "github.com/redhat-nfvpe/koko"
   "github.com/coreos/etcd/client"
 )
 
@@ -46,8 +47,6 @@ const defaultCNIDir = "/var/lib/cni/multus"
 const DEBUG = true
 const PERFORM_DELETE = false
 
-var etcd_host string
-
 var kapi client.KeysAPI
 
 var logger = log.New(os.Stderr, "", 0)
@@ -56,10 +55,25 @@ var masterpluginEnabled bool
 
 type NetConf struct {
   types.NetConf
-  CNIDir    string                   `json:"cniDir"`
-  Delegate map[string]interface{}    `json:"delegate"`
-  Etcd_host string                   `json:"etcd_host"`
-  Use_labels bool                    `json:"use_labels"`
+  CNIDir    string                    `json:"cniDir"`
+  Delegate map[string]interface{}     `json:"delegate"`
+  Etcd_host string                    `json:"etcd_host"`
+  Use_labels bool                     `json:"use_labels"`
+  Child_path string                   `json:"child_path"`
+  Boot_network map[string]interface{} `json:"boot_network"`
+}
+
+type LinkInfo struct {
+  Pod_name string
+  Target_pod string
+  Target_container string
+  Public_ip string
+  Local_ip string
+  Local_ifname string
+  Pair_name string
+  Pair_ip string
+  Pair_ifname string
+  Primary string
 }
 
 //taken from cni/plugins/meta/flannel/flannel.go
@@ -247,30 +261,6 @@ func clearPlugins(mIdx int, pIdx int, argIfname string, delegates []map[string]i
   return nil
 }
 
-func isContainerAlive(containername string) bool {
-  isalive := false
-
-  target_key := "/ratchet/byname/" + containername
-  _, err := kapi.Get(context.Background(), target_key, nil)
-  if err != nil {
-
-      // ErrorCodeKeyNotFound = Key not found, that's exactly the one we know is good.
-      // So let's log when it's not that.
-      // Passing along on this.
-      /*
-      if (err != client.ErrorCodeKeyNotFound) {
-        logger.Println(fmt.Errorf("isContainerAlive - possible missing value %s: %v", target_key, err))
-      }
-      */
-
-    } else {
-      // no error? must be there.
-      isalive = true
-    }
-
-  return isalive
-
-}
 
 func getContainerIDByName(containername string) (error, string) {
   
@@ -298,7 +288,7 @@ func amIAlive(containerid string) bool {
       // Passing along on this.
       /*
       if (err != client.ErrorCodeKeyNotFound) {
-        logger.Println(fmt.Errorf("isContainerAlive - possible missing value %s: %v", target_key, err))
+        logger.Println(fmt.Errorf("isPairContainerAlive - possible missing value %s: %v", target_key, err))
       }
       */
 
@@ -386,10 +376,7 @@ func printResults(delresult *types.Result) error {
   return delresult.Print()
 }
 
-
 func ratchet(netconf *NetConf,argif string,containerid string) error {
-
-  var result error
 
   // Alright first few things:
   // 1. Here is where I'd add that we check the k8s api
@@ -401,23 +388,19 @@ func ratchet(netconf *NetConf,argif string,containerid string) error {
   // -- this interface defined the "delegate" section in the config
   // -- defines which interface is used for "regular network access"
 
+  // --------------------- Setup delegate.
+
+  // This is a weak check, fwiw.
   if err := checkDelegate(netconf.Delegate); err != nil {
-    return fmt.Errorf("Multus: Err in delegate conf: %v", err)
+    return fmt.Errorf("Ratchet delegate: Err in delegate conf: %v", err)
+  }
+
+  if err := checkDelegate(netconf.Boot_network); err != nil {
+    return fmt.Errorf("Ratchet Boot_network: Err in delegate conf: %v", err)
   }
 
   podifName := getifname()
-  // var mIndex int
-  err, r := delegateAdd(podifName, argif, netconf.Delegate, false)
-  if err != nil {
-    panic(err)
-  }
-
-  // if err != true {
-  //   // result = r
-  //   // mIndex = index
-  // } else if (err != false) && r != nil {
-  //   // return r
-  // }
+  
 
   // ------------------------ Check label
   ctx := context.Background()
@@ -432,127 +415,81 @@ func ratchet(netconf *NetConf,argif string,containerid string) error {
 
   logger.Printf("DOUG !trace json >>>>>>>>>>>>>>>>>>>>>----------%v\n",json.Config.Labels)
 
+  // ------------------------ Determine container eligibility.
+
+  var err error
+  var r *types.Result
+
   if _, use_ratchet := json.Config.Labels["ratchet"]; use_ratchet {
+
     logger.Println("USE RATCHET ----------------------->>>>>>>>>>>>>>>")
+    // We want to use the ratchet "boot_network"
+    err, r = delegateAdd(podifName, argif, netconf.Boot_network, false)
+    if err != nil {
+      logger.Printf("ratchet delegateAdd boot_network error ----------%v",err)
+      return err
+    }
+
   } else {
-    logger.Println("DO NOT USE RATCHET ---------------------<<<<<<<<<<<<<<<")
-    if (netconf.Use_labels) {
-      // When using labels, we're done, now.
-      // So return...
-      logger.Println("USING LABELS HERE ---------------------<<<<<<<<<<<<<<<")
-      return printResults(r)
-    } else {
-      // When using not using labels (typically for development)
-      // we continue along.
-      logger.Println("NO NO NOT USING LABELS HERE ---------------------<<<<<<<<<<<<<<<")
+
+    // We used to switch here depending on the use_labels flag, which is seemingly obsolete.
+    // But, now, we just use the delegate.
+    // var mIndex int
+    logger.Println("DO NOT USE RATCHET (passthrough)----------------------->>>>>>>>>>>>>>>")
+    err, r = delegateAdd(podifName, argif, netconf.Delegate, false)
+    if err != nil {
+      logger.Printf("ratchet delegateAdd passthrough error ----------%v",err)
+      return err
     }
-  }
 
-  if (DEBUG) {
-    koko.TestOne()
-  
-    // Docker inspect.
-    dump_json := spew.Sdump(json)
-    logger.Printf("DOUG !trace json ----------%v\n",dump_json)
-  
-    // dump_netconf := spew.Sdump(netconf)
-    // os.Stderr.WriteString("DOUG !trace ----------\n" + dump_netconf)
-    // os.Stderr.WriteString("Before sleep......................")
-    // time.Sleep(10 * time.Second)
-    // os.Stderr.WriteString("After sleep......................")
-  }
-
-  // Keep out etcdhost around.
-  etcd_host = netconf.Etcd_host
-
-  // Go into a loop determining if we're alive 
-  tries := 0
-  i_am_alive := false
-  for amIAlive(containerid) == false {
+    return printResults(r)
     
-    tries++
-
-    if (DEBUG) {
-      logger.Printf("Am I alive? containerid: %v (%v retries)\n",containerid,tries);
-    }
-
-    // We either timeout, or, we're alive.
-    if (tries >= ALIVE_WAIT_RETRIES || i_am_alive) {
-      return fmt.Errorf("Timeout: could not find this container is alive via metadata in %v tries", tries)
-    }
-
-    // Wait for however long.
-    time.Sleep(ALIVE_WAIT_SECONDS * time.Second)
   }
 
-  // If it's determined that we're alive, now we can see if we're primary.
-  // If we're not primary, we can just exit right now.
-  // Cause the primary side will add to this pair.
+  // If you get to this point -- you're eligible for treatment under ratchet.
 
-  // Go and pick up metadata about me from etcd.
-  my_meta := getEtcdMetaData(containerid,true)
+  // Populate all the possible link info.
 
-  if (my_meta["primary"] != "true") {
-    // Ok, we're not primary. So... time to exit.
-    if (DEBUG) {
-      logger.Printf("Normal termination, this container is not primary (name: %v, containerid: %v, primary: %v)",my_meta["pod_name"],containerid,my_meta["primary"]);
-    }
+  linki := LinkInfo{}
+  linki.Pod_name = json.Config.Labels["ratchet.pod_name"]
+  linki.Target_pod = json.Config.Labels["ratchet.target_pod"]
+  linki.Target_container = json.Config.Labels["ratchet.target_container"]
+  linki.Public_ip = json.Config.Labels["ratchet.public_ip"]
+  linki.Local_ip = json.Config.Labels["ratchet.local_ip"]
+  linki.Local_ifname = json.Config.Labels["ratchet.local_ifname"]
+  linki.Pair_name = json.Config.Labels["ratchet.pair_name"]
+  linki.Pair_ip = json.Config.Labels["ratchet.pair_ip"]
+  linki.Pair_ifname = json.Config.Labels["ratchet.pair_ifname"]
+  linki.Primary = json.Config.Labels["ratchet.primary"]
 
-    return nil
-  }
+  dump_linki := spew.Sdump(linki)
+  logger.Printf("DOUG !trace linki ----------%v\n",dump_linki)
 
-  // Check to see there's a valid pair name.
-  if (len(my_meta["pair_name"]) <= 1) {
-    // That's not good.
-    return fmt.Errorf("Pair name appears to be invalid: %v", my_meta["pair_name"])
-  }
+  // Spawn external process.
+  // ...pass tons of link info along with some basics.
 
-  // Now we want to check and see if the pair container is alive.
-  // So it's time to go into a loop and do that.
-  // if the pair container is alive -- bada bing, we can execute koko.
+  // logger.Printf("executing path: %v / argif: %v / containerID: %v / etcd_host: %v",netconf.Child_path,argif,containerid,netconf.Etcd_host);
+  // exec_string := netconf.Child_path + " " + argif + " " + containerid + " " + netconf.Etcd_host
+  // logger.Printf("executing path composite: %v",exec_string);
+  cmd := exec.Command(
+    netconf.Child_path,       // 0
+    argif,                    // 1
+    containerid,
+    netconf.Etcd_host,
+    linki.Pod_name,
+    linki.Target_pod,
+    linki.Target_container,
+    linki.Public_ip,
+    linki.Local_ip,
+    linki.Local_ifname,
+    linki.Pair_name,
+    linki.Pair_ip,
+    linki.Pair_ifname,
+    linki.Primary,
+  )
+  cmd.Start()
 
-  for isContainerAlive(my_meta["pair_name"]) == false {
-    
-    tries++
-
-    if (DEBUG) {
-      logger.Printf("Is pair alive? pair_name: %v (%v retries)\n",my_meta["pair_name"],tries);
-    }
-
-    // We either timeout, or, we're alive.
-    if (tries >= ALIVE_WAIT_RETRIES || i_am_alive) {
-      return fmt.Errorf("Timeout: could not find that pair container is alive via metadata in %v tries", tries)
-    }
-
-    // Wait for however long.
-    time.Sleep(ALIVE_WAIT_SECONDS * time.Second)
-
-  }
-
-  // Alright, given that... we should have a valid pair.
-  // So let's pick up the pair container id.
-  pairid_err, pair_containerid := getContainerIDByName(my_meta["pair_name"])
-  if (pairid_err != nil) {
-    return pairid_err
-  }
-
-  // Now, we can probably rock out all the 
-  logger.Printf("And my pair's container id is: %v",pair_containerid)
-
-  // dump_my_meta := spew.Sdump(my_meta)
-  // os.Stderr.WriteString("The containerid: " + containerid + "\n")
-  // os.Stderr.WriteString("DOUG !trace my_meta ----------\n" + dump_my_meta)
-  // os.Stderr.WriteString("DOUG !trace pair_alive ----------" + fmt.Sprintf("%t",pair_alive) + "\n")
-
-  // !trace !bang
-  // This is how you call up koko.
-  // koko.VethCreator("foo","192.168.2.100/24","in1","bar","192.168.2.101/24","in2")
-  koko_err := koko.VethCreator(containerid,my_meta["local_ip"],my_meta["local_ifname"],pair_containerid,my_meta["pair_ip"],my_meta["pair_ifname"])
-  if (koko_err != nil) {
-    return koko_err
-  }
-
-  return result
+  return printResults(r)
 
 }
 
@@ -568,6 +505,7 @@ func cmdAdd(args *skel.CmdArgs) error {
   // logger.Println(reflect.TypeOf(n))
   rerr := ratchet(n,args.IfName,args.ContainerID)
   if rerr != nil {
+    logger.Printf("Ratchet error from cmdAdd handler: %v",rerr)
     return rerr
   }
 
@@ -658,7 +596,7 @@ func versionInfo(args *skel.CmdArgs) error {
 
 }
 
-func initEtcd() {
+func initEtcd(etcd_host string) {
 
   // Make a connection to etcd. Then we reuse the "kapi"
 
@@ -680,8 +618,6 @@ func main() {
   if (DEBUG) {
     logger.Println("[LOGGING ENABLED]")
   }
-  
-  initEtcd()
   
   skel.PluginMain(cmdAdd, cmdDel)
 }

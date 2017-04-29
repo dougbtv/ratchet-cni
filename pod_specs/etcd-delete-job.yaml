@@ -1,0 +1,19 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: etcd-delete
+spec:
+  template:
+    metadata:
+      name: etcd-delete
+    spec:
+      containers:
+      - name: etcd-delete
+        image: centos:centos7
+        command: ["/bin/bash"]
+        args:
+          - "-c"
+          - >
+            ETCD_HOST=etcd-client.default.svc.cluster.local;
+            curl -s -L -X DELETE http://$ETCD_HOST:2379/v2/keys/ratchet\?recursive=true;
+      restartPolicy: Never

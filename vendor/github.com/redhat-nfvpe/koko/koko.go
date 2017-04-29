@@ -8,6 +8,7 @@ import (
 	"github.com/mattn/go-getopt"
 	"net"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 
@@ -60,7 +61,7 @@ func getVethPair(name1 string, name2 string) (link1 netlink.Link, link2 netlink.
 
 	link2, err = netlink.LinkByName(name2)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to lookup %q: %v\n", name2, err)
+		logger(fmt.Sprintf("Failed to lookup %q: %v\n", name2, err))
 	}
 
 	return
@@ -119,7 +120,7 @@ func getDockerContainerNS(containerID string) (namespace string, err error) {
 	return
 }
 
-// vEth is a structure to descrive veth interfaces.
+// vEth is a structure to describe veth interfaces.
 type vEth struct {
 	nsName		string		// What's the network namespace?
 	linkName	string		// And what will we call the link.
@@ -127,7 +128,7 @@ type vEth struct {
 	ipAddr		net.IPNet	// What is that ip address.
 }
 
-// vxLan is a structure to descrive vxlan endpoint.
+// vxLan is a structure to describe vxlan endpoint.
 type vxLan struct {
 	parentIF	string		// parent interface name
 	id		int		// VxLan ID
@@ -140,12 +141,12 @@ func (veth *vEth) setVethLink(link netlink.Link) (err error) {
 	vethNs, err := ns.GetNS(veth.nsName)
 
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v", err)
+		logger("setVethLink a: " + fmt.Sprintf("%v", err))
 	}
 	defer vethNs.Close()
 
 	if err := netlink.LinkSetNsFd(link, int(vethNs.Fd())); err != nil {
-		fmt.Fprintf(os.Stderr, "%v", err)
+		logger("setVethLink b: " + fmt.Sprintf("%v", err))
 	}
 
 	err = vethNs.Do(func(_ ns.NetNS) error {
@@ -177,7 +178,7 @@ func (veth *vEth) removeVethLink() (err error) {
 	vethNs, err := ns.GetNS(veth.nsName)
 
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v", err)
+		logger(fmt.Sprintf("%v", err))
 	}
 	defer vethNs.Close()
 
@@ -203,7 +204,7 @@ func makeVeth(veth1 vEth, veth2 vEth) {
 
 	link1, link2, err := getVethPair(veth1.linkName, veth2.linkName)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v", err)
+		logger("makeVeth a:" + fmt.Sprintf("%v", err))
 	}
 
 	veth1.setVethLink(link1)
@@ -215,16 +216,16 @@ func makeVxLan(veth1 vEth, vxlan vxLan) {
 
 	err := addVxLanInterface(vxlan, veth1.linkName)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "vxlan add failed: %v", err)
+		logger("makeVxlan b:" + fmt.Sprintf("vxlan add failed: %v", err))
 	}
 
 	link, err2 := netlink.LinkByName(veth1.linkName)
 	if err2 != nil {
-		fmt.Fprintf(os.Stderr, "Cannot get %s: %v", veth1.linkName, err)
+		logger("makeVxlan c:" + fmt.Sprintf("Cannot get %s: %v", veth1.linkName, err))
 	}
 	err = veth1.setVethLink(link)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Cannot add IPaddr/netns failed: %v", err)
+		logger("makeVxlan d:" + fmt.Sprintf("Cannot add IPaddr/netns failed: %v", err))
 	}
 }
 
@@ -238,7 +239,7 @@ func parseNOption(s string) (veth vEth, err error) {
 
 	veth.nsName = fmt.Sprintf("/var/run/netns/%s", n[0])
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v", err)
+		logger(fmt.Sprintf("%v", err))
 	}
 
 	veth.linkName = n[1]
@@ -270,7 +271,7 @@ func parseDOption(s string) (veth vEth, err error) {
 
 	veth.nsName, err = getDockerContainerNS(n[0])
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v", err)
+		logger(fmt.Sprintf("%v", err))
 	}
 
 	veth.linkName = n[1]
@@ -327,14 +328,63 @@ func usage() {
 
 }
 
+func logger(input string) {
+
+  // exec_command := 
+  // os.Stderr.WriteString("!trace alive The containerid: |" + exec_command + "|||\n")
+  cmd := exec.Command("/bin/bash", "-c", "echo \"ratchet-child: " + input + "\" | systemd-cat")
+  cmd.Start()
+
+}
+
+func getProcessNamespace(containerid string) (error,string) {
+
+	// Pick up the pid from docker inspect.
+	// Template the path to that
+
+	cli, err := client.NewEnvClient()
+	if err != nil {
+		err = fmt.Errorf("failed to do NewEnvClient: %v", err)
+		return err, ""
+	}
+
+	cli.UpdateClientVersion("1.24")
+
+	json, err := cli.ContainerInspect(context.Background(), containerid)
+	if err != nil {
+		err = fmt.Errorf("failed to get container info: %v", err)
+		return err, ""
+	}
+
+	/*
+
+	This would be nice to check, but, I'm not sure what to look for.
+
+	if json.State.Pid == nil {
+		err = fmt.Errorf("failed to get container info: %v", err)
+		return err, ""
+	}
+	*/
+
+	return nil, "/proc/" + strconv.Itoa(json.State.Pid) + "/ns/net"
+
+}
+
 func VethCreator (local_container string, local_ipnetmask string, local_ifname string, pair_container string, pair_ipnetmask string, pair_ifname string) (err error) {
+
+	logger("!trace a")
 
 	vethA := vEth{}
 	vethB := vEth{}
 
 	// Get the pieces for vethA ----------------------------------
 
-	vethA.nsName, err = getDockerContainerNS(local_container)
+	err, vethA.nsName = getProcessNamespace(local_container)
+	logger(fmt.Sprintf("vethA.nsName: %v",vethA.nsName))
+	if err != nil {
+		err = fmt.Errorf("Failure to get docker container ns (vetha) -- %v: %v", pair_container, err)
+		return err
+	}
 
 	ip, mask, err := net.ParseCIDR(local_ipnetmask)
 	if err != nil {
@@ -349,9 +399,10 @@ func VethCreator (local_container string, local_ipnetmask string, local_ifname s
 
 	// Get the pieces for vethB ----------------------------------
 
-	vethB.nsName, err = getDockerContainerNS(pair_container)
+	err, vethB.nsName = getProcessNamespace(pair_container)
+	logger(fmt.Sprintf("vethB.nsName: %v",vethB.nsName))
 	if err != nil {
-		err = fmt.Errorf("Failure to get docker container ns -- %v: %v", pair_container, err)
+		err = fmt.Errorf("Failure to get docker container ns (vethb) -- %v: %v", pair_container, err)
 		return err
 	}
 
@@ -361,22 +412,30 @@ func VethCreator (local_container string, local_ipnetmask string, local_ifname s
 		return err2
 	}
 
+
 	vethB.linkName = pair_ifname
 	vethB.ipAddr.IP = ip
 	vethB.ipAddr.Mask = mask.Mask
 	vethB.withIPAddr = true
 
+
+
 	// -------------------- doug debug.
 
 	dump_vetha := spew.Sdump(vethA)
-  os.Stderr.WriteString("DOUG !trace vethA ----------\n" + dump_vetha)
+	logger("DOUG !trace vethA ----------\n" + dump_vetha)
 
+	logger("!trace e")
+	
 	dump_vethb := spew.Sdump(vethB)
-  os.Stderr.WriteString("DOUG !trace vethB ----------\n" + dump_vethb)
+	logger("DOUG !trace vethB ----------\n" + dump_vethb)
   
+	logger("!trace f")
 
 	// ------ And finally don't forget...
 	makeVeth(vethA, vethB)
+
+	logger("!trace g")
 
 	return nil
 
@@ -432,19 +491,19 @@ func main() {
 			if cnt == 0 {
 				veth1, err = parseDOption(getopt.OptArg)
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "Parse failed %s!:%v", getopt.OptArg, err)
+					logger(fmt.Sprintf("Parse failed %s!:%v", getopt.OptArg, err))
 					usage()
 					os.Exit(1)
 				}
 			} else if cnt == 1 {
 				veth2, err = parseDOption(getopt.OptArg)
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "Parse failed %s!:%v", getopt.OptArg, err)
+					logger(fmt.Sprintf("Parse failed %s!:%v", getopt.OptArg, err))
 					usage()
 					os.Exit(1)
 				}
 			} else {
-				fmt.Fprintf(os.Stderr, "Too many config!")
+				logger(fmt.Sprintf("Too many config!"))
 				usage()
 				os.Exit(1)
 			}
@@ -454,12 +513,12 @@ func main() {
 			if cnt == 0 {
 				veth1, err = parseDOption(getopt.OptArg)
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "Parse failed %s!:%v", getopt.OptArg, err)
+					logger(fmt.Sprintf("Parse failed %s!:%v", getopt.OptArg, err))
 					usage()
 					os.Exit(1)
 				}
 			} else {
-				fmt.Fprintf(os.Stderr, "Too many config!")
+				logger(fmt.Sprintf("Too many config!"))
 				usage()
 				os.Exit(1)
 			}
@@ -470,19 +529,19 @@ func main() {
 			if cnt == 0 {
 				veth1, err = parseNOption(getopt.OptArg)
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "Parse failed %s!:%v", getopt.OptArg, err)
+					logger(fmt.Sprintf("Parse failed %s!:%v", getopt.OptArg, err))
 					usage()
 					os.Exit(1)
 				}
 			} else if cnt == 1 {
 				veth2, err = parseNOption(getopt.OptArg)
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "Parse failed %s!:%v", getopt.OptArg, err)
+					logger(fmt.Sprintf("Parse failed %s!:%v", getopt.OptArg, err))
 					usage()
 					os.Exit(1)
 				}
 			} else {
-				fmt.Fprintf(os.Stderr, "Too many config!")
+				logger(fmt.Sprintf("Too many config!"))
 				usage()
 				os.Exit(1)
 			}
@@ -492,12 +551,12 @@ func main() {
 			if cnt == 0 {
 				veth1, err = parseNOption(getopt.OptArg)
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "Parse failed %s!:%v", getopt.OptArg, err)
+					logger(fmt.Sprintf("Parse failed %s!:%v", getopt.OptArg, err))
 					usage()
 					os.Exit(1)
 				}
 			} else {
-				fmt.Fprintf(os.Stderr, "Too many config!")
+				logger(fmt.Sprintf("Too many config!"))
 				usage()
 				os.Exit(1)
 			}

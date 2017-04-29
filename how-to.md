@@ -515,4 +515,46 @@ And it's in the docker inspect.
                 "com.ratchet": "true",
 ```
 
-Now, how the hell to pull that out?
+Now, how the hell to pull that out? Got it.
+
+## LABEL TIME.
+
+Ok, we're going to do a lot more with labels, it's how we're going to learn all about ourself, and who our pair is.
+
+Then we'll pair up async. This is due to a big fat chicken-and-egg with infra containers. And infra containers are unknown to the API, too.
+
+Now... How to test this...
+
+First I modify the `docker-run.sh` from CNI proper which emulates the use of infra containers. Then I use the `--label-file` parameter for `docker-run` this way we can play in dev. Looks like this.
+
+```
+[centos@cni scripts]$ diff docker-run.sh docker-run-custom.sh 
+8c8
+< contid=$(docker run -d --net=none busybox:latest /bin/sleep 10000000)
+---
+> contid=$(docker run -d --net=none --label-file ./primary.label busybox:latest /bin/sleep 10000000)
+
+[centos@cni scripts]$ cat primary.label 
+# Comment like so.
+ratchet=true
+ratchet.pod_name=primary-pod
+ratchet.target_pod=primary-pod
+ratchet.target_container=primary-pod
+ratchet.public_ip=1.1.1.1
+ratchet.local_ip=192.168.2.100
+ratchet.local_ifname=in1
+ratchet.pair_name=pair-pod
+ratchet.pair_ip=192.168.2.101
+ratchet.pair_ifname=in2
+ratchet.primary=true
+
+
+[centos@cni scripts]$ sudo CNI_PATH=$CNI_PATH ./docker-run-custom.sh --label-file ./primary.label  --rm center sleep 700
+```
+
+## Child process refactor...
+
+starting to question it.
+
+Let's experiment with a revert.
+

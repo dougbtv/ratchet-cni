@@ -1,0 +1,4 @@
+# Comment like so.
+ratchet=true
+ratchet.pod_name=pair-pod
+ratchet.primary=false

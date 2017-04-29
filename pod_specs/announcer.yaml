@@ -1,0 +1,164 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: announcer
+  namespace: default
+---
+# Based on flannel RBAC
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  namespace: default
+  name: get-pods
+rules:
+- apiGroups: [""] # "" indicates the core API group
+  resources: ["pods"]
+  verbs: ["get", "watch", "list"]
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: announcer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: get-pods
+subjects:
+- kind: ServiceAccount
+  name: announcer
+  namespace: default
+- kind: ServiceAccount
+  name: default
+  namespace: default
+---
+# apiVersion: v1
+# kind: Pod
+# metadata:
+#   name: sample-announce
+# spec:
+#   serviceAccountName: announcer
+#   restartPolicy: Never
+#   containers:
+#     - name: target-container
+#       image: centos:centos7
+#       command: ["/bin/bash"]
+#       args:
+#         - "-c"
+#         - "while true; do sleep 1; done"
+#     - name: sample-announce
+#       image: dougbtv/jq
+#       command: ["/bin/bash"]
+#       env:
+#         - name: "POD_NAME"
+#           value: "sample-announce"
+#         - name: "TARGET_POD"
+#           value: "target-container"
+#         - name: "TARGET_CONTAINER"
+#           value: "target-container"
+#         - name: "PUBLIC_IP"
+#           value: "1.1.1.1"
+#         - name: "LOCAL_IP"
+#           value: "192.168.2.100"
+#         - name: "LOCAL_IFNAME"
+#           value: "in1"
+#         - name: "PAIR_NAME"
+#           value: "pair-pod"
+#         - name: "PAIR_IP"
+#           value: "192.168.2.101"
+#         - name: "PAIR_IFNAME"
+#           value: "in2"
+#         - name: "PRIMARY"
+#           value: "true"
+#       args:
+#         - "-c"
+#         - >
+#           KUBE_TOKEN=$(</var/run/secrets/kubernetes.io/serviceaccount/token);
+#           API_URL=https://kubernetes.default.svc.cluster.local/api/v1/namespaces/default/pods/$TARGET_POD;
+#           echo "----------------------- Waiting for target-container";
+#           found_it=false;
+#           counted=1;
+#           while [ "$found_it" = false ]; do
+#             echo "--------------------------------------------------- beginning"
+#             curl -sSk -H "Authorization: Bearer $KUBE_TOKEN" $API_URL ;
+#             echo "--------------------------------------------------- end"
+#             container_id=$(curl -sSk -H "Authorization: Bearer $KUBE_TOKEN" $API_URL | jq ".status.containerStatuses[] | select(.name==\"$TARGET_CONTAINER\") | .containerID";)
+#             echo $container_id | grep -P "docker";
+#             if [ "$?" = "0" ]; then
+#               found_it=true;
+#               container_id=$(echo $container_id | sed -e 's/"//g');
+#               container_id=$(echo $container_id | sed -e 's|docker://||g');
+#               echo "Found container_id (tries $counted): $container_id";
+#             fi;
+#             let "counted += 1";
+#             sleep 1;
+#           done;
+#           echo "----------------------- Setting etcd keys";
+#           ETCD_URL=http://etcd-client.default.svc.cluster.local:2379/v2/keys;
+#           curl -s -L -X PUT $ETCD_URL/ratchet/$container_id/pod_name -d value="$POD_NAME";
+#           curl -s -L -X PUT $ETCD_URL/ratchet/$container_id/pair_name -d value="$PAIR_NAME";
+#           curl -s -L -X PUT $ETCD_URL/ratchet/$container_id/public_ip -d value="$PUBLIC_IP";
+#           curl -s -L -X PUT $ETCD_URL/ratchet/$container_id/local_ip -d value="$LOCAL_IP";
+#           curl -s -L -X PUT $ETCD_URL/ratchet/$container_id/local_ifname -d value="$LOCAL_IFNAME";
+#           curl -s -L -X PUT $ETCD_URL/ratchet/$container_id/pair_ip -d value="$PAIR_IP";
+#           curl -s -L -X PUT $ETCD_URL/ratchet/$container_id/pair_ifname -d value="$PAIR_IFNAME";
+#           curl -s -L -X PUT $ETCD_URL/ratchet/$container_id/primary -d value="$PRIMARY";
+#           curl -s -L -X PUT $ETCD_URL/ratchet/byname/$POD_NAME -d value="$container_id";
+#           echo "----------------------- Getting etcd keys";
+#           curl -s -L $ETCD_URL/ratchet/$container_id/pod_name;
+#           curl -s -L $ETCD_URL/ratchet/$container_id/pair_name;
+#           curl -s -L $ETCD_URL/ratchet/$container_id/public_ip;
+#           curl -s -L $ETCD_URL/ratchet/$container_id/local_ip;
+#           curl -s -L $ETCD_URL/ratchet/$container_id/local_ifname;
+#           curl -s -L $ETCD_URL/ratchet/$container_id/pair_ip;
+#           curl -s -L $ETCD_URL/ratchet/$container_id/pair_ifname;
+#           curl -s -L $ETCD_URL/ratchet/$container_id/primary;
+#           curl -s -L $ETCD_URL/ratchet/byname/$POD_NAME;
+#           while true; do sleep 1; done;
+#     #       KUBE_TOKEN=$(</var/run/secrets/kubernetes.io/serviceaccount/token) &&
+#     #       podname=$(curl -sSk -H "Authorization: Bearer $KUBE_TOKEN" https://kubernetes.default.svc.cluster.local/api/v1/namespaces/default/pods | jq '.items[] .metadata.name' | grep -i demo | sed -e 's/\"//g') && 
+#     #       podip=$(curl -sSk -H "Authorization: Bearer $KUBE_TOKEN" https://kubernetes.default.svc.cluster.local/api/v1/namespaces/default/pods/$podname | jq '.status.podIP' | sed -s 's/\"//g') &&
+#     #       echo "the pod is @ $podip" &&
+#     #       curl -L -X PUT http://etcd-client.default.svc.cluster.local:2379/v2/keys/podip -d value="$podip"
+
+# # KUBE_TOKEN=$(</var/run/secrets/kubernetes.io/serviceaccount/token) && curl -sSk -H "Authorization: Bearer $KUBE_TOKEN" https://kubernetes.default.svc.cluster.local/api/v1/namespaces/default/pods
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: primary-pod
+  labels:
+    app: primary-pod
+    ratchet: "true"
+    ratchet.pod_name: "primary-pod"
+    ratchet.target_pod: "primary-pod"
+    ratchet.target_container: "primary-pod"
+    ratchet.public_ip: "1.1.1.1"
+    ratchet.local_ip: "192.168.2.100"
+    ratchet.local_ifname: "in1"
+    ratchet.pair_name: "pair-pod"
+    ratchet.pair_ip: "192.168.2.101"
+    ratchet.pair_ifname: "in2"
+    ratchet.primary: "true"
+spec:
+  containers:
+    - name: primary-pod
+      image: dougbtv/centos-network
+      command: ["/bin/bash"]
+      args: ["-c", "while true; do sleep 10; done"]
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pair-pod
+  labels:
+    app: pair-pod
+    ratchet: "true"
+    ratchet.pod_name: pair-pod
+    ratchet.primary: "false"
+spec:
+  containers:
+    - name: pair-pod
+      image: dougbtv/centos-network
+      command: ["/bin/bash"]
+      args: ["-c", "while true; do sleep 10; done"]
