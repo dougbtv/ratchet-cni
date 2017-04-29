@@ -43,6 +43,7 @@ import (
 
 const ALIVE_WAIT_SECONDS = 1
 const ALIVE_WAIT_RETRIES = 60
+const DELAY_KOKO_SECONDS = 1
 const defaultCNIDir = "/var/lib/cni/multus"
 const DEBUG = true
 const PERFORM_DELETE = false
@@ -311,6 +312,12 @@ func ratchet(argif string,containerid string, linki LinkInfo) error {
   // !trace !bang
   // This is how you call up koko.
   // koko.VethCreator("foo","192.168.2.100/24","in1","bar","192.168.2.101/24","in2")
+
+  // What about a healthy delay?
+  logger("Pre koko-delay, " + DELAY_KOKO_SECONDS + " SECONDS")
+  time.Sleep(DELAY_KOKO_SECONDS * time.Second)
+
+
   koko_err := koko.VethCreator(
     containerid,
     linki.Local_ip + "/24",
@@ -321,8 +328,11 @@ func ratchet(argif string,containerid string, linki LinkInfo) error {
   )
 
   if (koko_err != nil) {
+    logger(fmt.Sprintf("koko error in child: %v",koko_err))
     return koko_err
   }
+
+  logger("Koko appears to have completed with success.")
 
   return nil
 
@@ -400,7 +410,10 @@ func main() {
 
   err := ratchet(os.Args[1],os.Args[2],linki)
   if (err != nil) {
+    logger("completition WITH ERROR")
     logger(fmt.Sprintf("%v",err))
+  } else {
+    logger("ratchet completition, success. (containerid: " + os.Args[2] + ")")
   }
   
 }
