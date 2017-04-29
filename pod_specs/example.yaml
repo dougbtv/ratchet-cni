@@ -1,0 +1,40 @@
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: primary-pod
+  labels:
+    app: primary-pod
+    ratchet: "true"
+    ratchet.pod_name: "primary-pod"
+    ratchet.target_pod: "primary-pod"
+    ratchet.target_container: "primary-pod"
+    ratchet.public_ip: "1.1.1.1"
+    ratchet.local_ip: "192.168.2.100"
+    ratchet.local_ifname: "in1"
+    ratchet.pair_name: "pair-pod"
+    ratchet.pair_ip: "192.168.2.101"
+    ratchet.pair_ifname: "in2"
+    ratchet.primary: "true"
+spec:
+  containers:
+    - name: primary-pod
+      image: dougbtv/centos-network
+      command: ["/bin/bash"]
+      args: ["-c", "while true; do sleep 10; done"]
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pair-pod
+  labels:
+    app: pair-pod
+    ratchet: "true"
+    ratchet.pod_name: pair-pod
+    ratchet.primary: "false"
+spec:
+  containers:
+    - name: pair-pod
+      image: dougbtv/centos-network
+      command: ["/bin/bash"]
+      args: ["-c", "while true; do sleep 10; done"]
