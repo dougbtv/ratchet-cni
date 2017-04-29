@@ -12,3 +12,7 @@ The name idea comes from the idea of a [ratchet puller](https://en.wikipedia.org
 
 * `cni/ns`
 * `nfvpe/koko`
+
+## Significant...
+
+Just got this mother-fuuuu to work in kube.
