@@ -1,5 +1,7 @@
 # Ratchet CNI
 
++![ratchet_logo][ratchet_logo]
+
 A [CNI](https://github.com/containernetworking/cni) plugin (generally for Kubernetes) to create multiple isolated networks using [koko](https://github.com/redhat-nfvpe/koko), the container connector. Currently, it creates a veth pair between containers to facilitate network isolation, and uses a method similar to [Multus CNI](https://github.com/Intel-Corp/multus-cni) to attach multiple interfaces to a pod, where one is 
 
 The configuration allows you to pass-through another CNI plugin to some containers (say, Flannel), yet lets you specifically configure other pods to be eligible for treatment under the network isolation scheme as per Ratchet. For now, ones specifies labels for eligible pods to be treated under Ratchet.
@@ -89,3 +91,6 @@ The name idea comes from the idea of a [ratchet puller](https://en.wikipedia.org
 ## Customized these Go modules...
 
 * `nfvpe/koko`
+
+
+[ratchet_logo]: docs/ratchet.png
