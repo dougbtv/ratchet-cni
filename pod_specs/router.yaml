@@ -1,0 +1,88 @@
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: centosa
+  labels:
+    app: centosa
+    ratchet: "true"
+    ratchet.pod_name: "centosa"
+    ratchet.target_pod: "centosa"
+    ratchet.target_container: "centosa"
+    ratchet.public_ip: "1.1.1.1"
+    ratchet.local_ip: "192.168.2.100"
+    ratchet.local_ifname: "in1"
+    ratchet.pair_name: "quagga-a"
+    ratchet.pair_ip: "192.168.2.101"
+    ratchet.pair_ifname: "in2"
+    ratchet.primary: "true"
+spec:
+  containers:
+    - name: centosa
+      image: dougbtv/centos-network
+      command: ["/bin/bash"]
+      args: ["-c", "while true; do sleep 10; done"]
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: quagga-a
+  labels:
+    app: quagga-a
+    ratchet: "true"
+    ratchet.pod_name: "quagga-a"
+    ratchet.target_pod: "quagga-a"
+    ratchet.target_container: "quagga-a"
+    ratchet.public_ip: "2.2.2.2"
+    ratchet.local_ip: "192.168.3.100"
+    ratchet.local_ifname: "mid1"
+    ratchet.pair_name: "quagga-b"
+    ratchet.pair_ip: "192.168.3.101"
+    ratchet.pair_ifname: "mid2"
+    ratchet.primary: "true"
+spec:
+  containers:
+    - name: quagga-a
+      image: dougbtv/centos-network
+      command: ["/bin/bash"]
+      args: ["-c", "while true; do sleep 10; done"]
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: quagga-b
+  labels:
+    app: quagga-b
+    ratchet: "true"
+    ratchet.pod_name: "quagga-b"
+    ratchet.target_pod: "quagga-b"
+    ratchet.target_container: "quagga-b"
+    ratchet.public_ip: "3.3.3.3"
+    ratchet.local_ip: "192.168.4.100"
+    ratchet.local_ifname: "out1"
+    ratchet.pair_name: "centosb"
+    ratchet.pair_ip: "192.168.4.101"
+    ratchet.pair_ifname: "out2"
+    ratchet.primary: "true"
+spec:
+  containers:
+    - name: quagga-b
+      image: dougbtv/centos-network
+      command: ["/bin/bash"]
+      args: ["-c", "while true; do sleep 10; done"]
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: centosb
+  labels:
+    app: centosb
+    ratchet: "true"
+    ratchet.pod_name: centosb
+    ratchet.primary: "false"
+spec:
+  containers:
+    - name: centosb
+      image: dougbtv/centos-network
+      command: ["/bin/bash"]
+      args: ["-c", "while true; do sleep 10; done"]

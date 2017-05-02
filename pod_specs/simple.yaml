@@ -1,13 +1,13 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: nginx
+  name: testrouter
   labels:
-    app: nginx
+    app: testrouter
     ratchet: "true"
 spec:
   containers:
-    - name: nginx
-      image: nginx
-      ports:
-        - containerPort: 80
+    - name: testrouter
+      image: dougbtv/centos-network
+      command: ["/bin/bash"]
+      args: ["-c", "while true; do sleep 10; done"]
