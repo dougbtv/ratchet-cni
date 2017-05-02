@@ -12,6 +12,10 @@ More to come, it's a prototype.
 
 Requires that you have [etcd](https://github.com/coreos/etcd) running, and the compute nodes in your Kubernetes cluster have network access to that etcd.
 
+## Current limitations
+
+Currently, Ratchet only uses the vEth features of Koko, and not the VXLAN functionality -- so it will only work for pods that are launched on the same minion node.
+
 ## Building Ratchet.
 
 Requires Go 1.6. Clone this project and:
@@ -83,6 +87,36 @@ You can create the example pods with:
 ```
 kubectl create -f ./pod_specs/example.yaml
 ```
+
+## Looking at the pod labels.
+
+Pairs are able to be discovered using the meta data available in the pod labels. This defines which pods will be linked together, and their defined network properties as set in the labels. These properties are then stored in etcd to allow Ratchet to connect them once the proper infra container comes up.
+
+Looking at the `./pod_specs/example.yaml` file, let's look at what we have:
+
+```yaml
+  labels:
+    app: primary-pod
+    ratchet: "true"
+    ratchet.pod_name: "primary-pod"
+    ratchet.target_pod: "primary-pod"
+    ratchet.target_container: "primary-pod"
+    ratchet.public_ip: "1.1.1.1"
+    ratchet.local_ip: "192.168.2.100"
+    ratchet.local_ifname: "in1"
+    ratchet.pair_name: "pair-pod"
+    ratchet.pair_ip: "192.168.2.101"
+    ratchet.pair_ifname: "in2"
+    ratchet.primary: "true"
+```
+
+In this case, these labels are applied to a pod named `primary-pod` and we specify that we're going to pair with the pod which has the name in the `ratchet.pair_name` label, in this case `pair-pod`
+
+Only one pod in the pair can have `ratchet.primary: "true"`.
+
+The pod named `primary-pod` will be assigned `192.168.2.100` IP address on an interface named `in1`, and the pod named `pair-pod` will be assigned the IP of `192.168.2.101` on an interface named `in2` -- interfaces `in1` and `in2` are two ends of a veth pair as created by Koko. Right now these are in a statically defined `/24` network, that will be improved in the future.
+
+...More explanation to come.
 
 ## Behind the name
 
