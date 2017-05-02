@@ -33,7 +33,7 @@ Requires Go 1.6. Clone this project and:
 
 Here's a sample configuration that uses Flannel for pods which are not eligible for treatment under Rathet, and uses a loopback device for the "boot network".
 
-```
+```json
 {
   "name": "ratchet-demo",
   "type": "ratchet",
