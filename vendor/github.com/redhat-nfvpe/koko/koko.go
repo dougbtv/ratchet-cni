@@ -328,12 +328,16 @@ func usage() {
 
 }
 
+const LOG_OUTPUT = false
+
 func logger(input string) {
 
-  // exec_command := 
-  // os.Stderr.WriteString("!trace alive The containerid: |" + exec_command + "|||\n")
-  cmd := exec.Command("/bin/bash", "-c", "echo \"ratchet-child: " + input + "\" | systemd-cat")
-  cmd.Start()
+	if (LOG_OUTPUT) {
+	  // exec_command := 
+	  // os.Stderr.WriteString("!trace alive The containerid: |" + exec_command + "|||\n")
+	  cmd := exec.Command("/bin/bash", "-c", "echo \"ratchet-child: " + input + "\" | systemd-cat")
+	  cmd.Start()
+	}
 
 }
 
@@ -372,15 +376,13 @@ func getProcessNamespace(containerid string) (error,string) {
 
 func VethCreator (local_container string, local_ipnetmask string, local_ifname string, pair_container string, pair_ipnetmask string, pair_ifname string) (err error) {
 
-	logger("!trace a")
-
 	vethA := vEth{}
 	vethB := vEth{}
 
 	// Get the pieces for vethA ----------------------------------
 
 	err, vethA.nsName = getProcessNamespace(local_container)
-	logger(fmt.Sprintf("vethA.nsName: %v",vethA.nsName))
+	// logger(fmt.Sprintf("vethA.nsName: %v",vethA.nsName))
 	if err != nil {
 		err = fmt.Errorf("Failure to get docker container ns (vetha) -- %v: %v", pair_container, err)
 		return err
@@ -400,7 +402,7 @@ func VethCreator (local_container string, local_ipnetmask string, local_ifname s
 	// Get the pieces for vethB ----------------------------------
 
 	err, vethB.nsName = getProcessNamespace(pair_container)
-	logger(fmt.Sprintf("vethB.nsName: %v",vethB.nsName))
+	// logger(fmt.Sprintf("vethB.nsName: %v",vethB.nsName))
 	if err != nil {
 		err = fmt.Errorf("Failure to get docker container ns (vethb) -- %v: %v", pair_container, err)
 		return err
@@ -430,12 +432,8 @@ func VethCreator (local_container string, local_ipnetmask string, local_ifname s
 	dump_vethb := spew.Sdump(vethB)
 	logger("DOUG !trace vethB ----------\n" + dump_vethb)
   
-	logger("!trace f")
-
 	// ------ And finally don't forget...
 	makeVeth(vethA, vethB)
-
-	logger("!trace g")
 
 	return nil
 
