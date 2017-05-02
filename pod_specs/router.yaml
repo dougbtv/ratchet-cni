@@ -123,50 +123,6 @@ spec:
       securityContext:
         privileged: true
 ---
-# ---
-# apiVersion: v1
-# kind: Pod
-# metadata:
-#   creationTimestamp: null
-#   name: quaggab
-# spec:
-#   containers:
-#     - name: quaggab
-#       image: dougbtv/quagga
-#       securityContext:
-#         privileged: true
-#       volumeMounts:
-#         - mountPath: /etc/quagga/
-#           name: config
-#   restartPolicy: Never
-#   volumes:
-#     - name: config
-#       configMap:
-#         name: quagga-config
-#         items:
-#         - key: ospfd.conf
-#           path: ospfd.conf
-#         - key: daemons
-#           path: daemons
-#         - key: vtysh.conf
-#           path: vtysh.conf
-#         - key: debian.conf
-#           path: debian.conf
-# status: {}
-# ---
-# apiVersion: v1
-# kind: Pod
-# metadata:
-#   creationTimestamp: null
-#   name: centosb
-# spec:
-#   containers:
-#     - name: centosb
-#       image: dougbtv/centos-network
-#       securityContext:
-#         privileged: true
-#       command: ["/bin/bash", "-c", "while true; do sleep 2; done"]
----
 apiVersion: v1
 kind: ConfigMap
 metadata:
