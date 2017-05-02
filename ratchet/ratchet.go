@@ -261,117 +261,6 @@ func clearPlugins(mIdx int, pIdx int, argIfname string, delegates []map[string]i
   return nil
 }
 
-
-func getContainerIDByName(containername string) (error, string) {
-  
-  target_key := "/ratchet/byname/" + containername
-  resp_containerid, err := kapi.Get(context.Background(), target_key, nil)
-  if err != nil {
-
-      return fmt.Errorf("Error picking up container id by name: %v",containername), ""
-
-    } else {
-      return nil, resp_containerid.Node.Value;
-    }
-
-}
-
-func amIAlive(containerid string) bool {
-  isalive := false
-
-  target_key := "/ratchet/" + containerid + "/pod_name"
-  _, err := kapi.Get(context.Background(), target_key, nil)
-  if err != nil {
-
-      // ErrorCodeKeyNotFound = Key not found, that's exactly the one we know is good.
-      // So let's log when it's not that.
-      // Passing along on this.
-      /*
-      if (err != client.ErrorCodeKeyNotFound) {
-        logger.Println(fmt.Errorf("isPairContainerAlive - possible missing value %s: %v", target_key, err))
-      }
-      */
-
-    } else {
-      // no error? must be there.
-      isalive = true
-    }
-
-  return isalive
-
-}
-
-
-// get the full meta data for a container given the containerid
-// if setalive is true, it also sets an "isalive" flag for the container.
-// is the isalive necessary?
-func getEtcdMetaData(containerid string, setalive bool) (map[string]string) {
-
-  all := make(map[string]string)
-
-  // All the properties we can have.
-  all["pod_name"] = ""
-  all["pair_name"] = ""
-  all["public_ip"] = ""
-  all["local_ip"] = ""
-  all["local_ifname"] = ""
-  all["pair_ip"] = ""
-  all["pair_ifname"] = ""
-  all["primary"] = ""
-  all["isalive"] = ""
-
-  for k, _ := range all { 
-    // Print all possibilities...
-    // logger.Printf("key[%s] value[%s]\n", k, v)
-
-    // get a key's value
-    // logger.Print("Getting '/ratchet/" + containerid + "/" + k + "' key value")
-    getcfg := &client.GetOptions{Recursive: true}
-    target_key := "/ratchet/" + containerid + "/" + k
-    message_resp, err := kapi.Get(context.Background(), target_key, getcfg)
-    if err != nil {
-
-      // For now, this seems to be just the missing values.
-      // ...which are generally fine.
-      // logger.Println(fmt.Errorf("possible missing value %s: %v", target_key, err))
-
-    } else {
-      // print common key info
-      // logger.Printf("Get is done. Metadata is %q\n", message_resp)
-      // print value
-
-      // dump_resp := spew.Sdump(message_resp)
-      // os.Stderr.WriteString("DOUG !trace message_resp ----------\n" + dump_resp)
-
-      // dump_adata := spew.Sdump(adata)
-      // os.Stderr.WriteString("DOUG !trace adata ----------\n" + dump_adata)
-
-      all[k] = message_resp.Node.Value;
-
-      // logger.Printf("%q key has %q value\n", message_resp.Node.Key, message_resp.Node.Value)
-    }
-
-
-  }
-
-  if (setalive) {
-
-    // set "/foo" key with "bar" value
-    // log.Print("Setting '/foo' key with 'bar' value")
-    _, err := kapi.Set(context.Background(), "/ratchet/" + containerid + "/isalive", "true", nil)
-    if err != nil {
-      log.Fatal(err)
-    } else {
-      // print common key info
-      // log.Printf("Set is done. Metadata is %q\n", resp)
-    }
-
-  }
-
-  return all
-
-}
-
 func printResults(delresult *types.Result) error {
   return delresult.Print()
 }
@@ -509,48 +398,6 @@ func cmdAdd(args *skel.CmdArgs) error {
     return rerr
   }
 
-
-  // for _, delegate := range n.Delegates {
-  //   if err := checkDelegate(delegate); err != nil {
-  //     return fmt.Errorf("Multus: Err in delegate conf: %v", err)
-  //   }
-  // }
-
-  // // dump_args := spew.Sdump(args)
-  // // os.Stderr.WriteString("DOUG !trace ----------\n" + dump_args)
-
-
-  // if err := saveDelegates(args.ContainerID, n.CNIDir, n.Delegates); err != nil {
-  //   return fmt.Errorf("Multus: Err in saving the delegates: %v", err)
-  // }
-
-  // podifName := getifname()
-  // var mIndex int
-  // for index, delegate := range n.Delegates {
-  //   err, r := delegateAdd(podifName, args.IfName, delegate, true)
-  //   if err != true {
-  //     result = r
-  //     mIndex = index
-  //   } else if (err != false) && r != nil {
-  //     return r
-  //   }
-  // }
-
-  // for index, delegate := range n.Delegates {
-  //   err, r := delegateAdd(podifName, args.IfName, delegate, false)
-  //   if err != true {
-  //     result = r
-  //   } else if (err != false) && r != nil {
-  //     perr := clearPlugins(mIndex, index, args.IfName, n.Delegates)
-  //     if perr != nil {
-  //       return perr
-  //     }
-  //     return r
-  //   }
-  // }
-
-  // return result
-
   return result
 
 }
@@ -566,24 +413,8 @@ func cmdDel(args *skel.CmdArgs) error {
     result = ratchet(in,args.IfName,args.ContainerID)
   }
 
-  // netconfBytes, err := consumeScratchNetConf(args.ContainerID, in.CNIDir)
-  // if err != nil {
-  //   return fmt.Errorf("Multus: Err in  reading the delegates: %v", err)
-  // }
-
-  // var Delegates []map[string]interface{}
-  // if err := json.Unmarshal(netconfBytes, &Delegates); err != nil {
-  //   return fmt.Errorf("Multus: failed to load netconf: %v", err)
-  // }
-
-  // podifName := getifname()
-  // for _, delegate := range Delegates {
-  //   r := delegateDel(podifName, args.IfName, delegate)
-  //   if r != nil {
-  //     return r
-  //   }
-  //   result = r
-  // }
+  // TODO: This doesn't perform any cleanup.
+  // r := delegateDel(podifName, args.IfName, delegate)
 
   return result
 }
