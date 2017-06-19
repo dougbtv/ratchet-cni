@@ -5,10 +5,14 @@ go:
 
 sudo: required
 
+services:
+  - docker
+
 before_install:
   - go get github.com/golang/lint/golint
 
 script:
+  # Generally build out everything we need.
   - cd ratchet
   - golint
   - go test -v
@@ -18,3 +22,4 @@ script:
   - golint
   - go test -v
   - go build
+  # Next steps, run it with the CNI docker stuff?
