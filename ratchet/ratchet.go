@@ -372,7 +372,7 @@ func ratchet(netconf *NetConf,argif string,containerid string) error {
     linki.TargetContainer,
     linki.PublicIP,
     linki.LocalIP,
-    linki.Local_ifname,
+    linki.LocalIFName,
     linki.PairName,
     linki.PairIP,
     linki.PairIFName,
