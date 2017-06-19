@@ -1,0 +1,20 @@
+language: go
+
+go:
+  - 1.7.x
+
+sudo: required
+
+before_install:
+  - go get github.com/golang/lint/golint
+
+script:
+  - cd ratchet
+  - golint
+  - go test -v
+  - go build
+  - cd ../
+  - cd ratchet-child
+  - golint
+  - go test -v
+  - go build
