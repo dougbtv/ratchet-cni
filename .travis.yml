@@ -5,11 +5,16 @@ go:
 
 sudo: required
 
+# env:
+#   - CNI_PATH=/opt/
+
 services:
   - docker
 
 before_install:
   - go get github.com/golang/lint/golint
+  - git clone https://github.com/containernetworking/cni.git /tmp/cni
+  - mkdir -p /etc/cni/net.d
 
 script:
   # Generally build out everything we need.
@@ -23,3 +28,25 @@ script:
   - go test -v
   - go build
   # Next steps, run it with the CNI docker stuff?
+  - export CNI_PATH=$(pwd)/bin
+  - | 
+    cat >/etc/cni/net.d/10-mynet.conf <<EOF
+    {
+      "name": "ratchet-demo",
+      "type": "ratchet",
+      "etcd_host": "localhost",
+      "child_path": "/opt/cni/bin/ratchet-child",
+      "delegate": {
+        "name": "cbr0",
+        "type": "flannel",
+        "delegate": {
+          "isDefaultGateway": true
+        }
+      },
+      "boot_network": {
+        "type": "loopback"
+      }
+    }
+    EOF
+  - cd /tmp/cni
+  - CNI_PATH=$CNI_PATH ./docker-run.sh --rm busybox:latest ifconfig
