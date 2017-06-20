@@ -118,6 +118,18 @@ The pod named `primary-pod` will be assigned `192.168.2.100` IP address on an in
 
 ...More explanation to come.
 
+## Compiling and deploying on a remote Kubernetes
+
+In the `./utils` directory there is an Ansible playbook to allow you to sync your current directory with a remote master, and compile ratchet there. This allows you to edit your code locally, and then deploy ratchet elsewhere. Primarily, edit the `remote.inventory` file to match your remote environment.
+
+You can synchronize and build your source with:
+
+```
+ansible-playbook -i remote.inventory sync-and-build.yml
+```
+
+
+
 ## Behind the name
 
 The name idea comes from the idea of a [ratchet puller](https://en.wikipedia.org/wiki/Come-A-Long) (aka: a come-a-long). Because in my mind it connects to something at one end, and then on the other end, you can crank on it to hold the pieces where they need to be.

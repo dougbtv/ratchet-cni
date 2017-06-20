@@ -1,0 +1,51 @@
+- hosts: master
+  tasks:
+
+    - name: "Install golang"
+      yum:
+        name: golang
+        state: present
+
+    - name: "Copy ssh key to master"
+      copy:
+        src: /home/doug/.ssh/id_testvms
+        dest: /home/centos/.ssh/id_testvms
+        owner: centos
+        group: centos
+        mode: 0600
+
+    - name: "Create ratchet directory on master"
+      file:
+        dest: /home/centos/gocode/src/ratchet
+        state: directory
+    - name: "rsync files to master"
+      synchronize:
+        src: ../../
+        dest: /home/centos/gocode/src/ratchet
+        use_ssh_args: yes
+        rsync_opts:
+          - "--exclude 'bin'"
+        #   - 'ssh -o ProxyCommand="ssh -W %h:%p root@192.168.1.119"'
+
+    - name: "Build Ratchet"
+      shell: >
+        ./build.sh
+      args:
+        chdir: /home/centos/gocode/src/ratchet
+
+    - name: "Copy ratchet binaries to local machine"
+      shell: >
+        cp -f /home/centos/gocode/src/ratchet/bin/* /opt/cni/bin/
+
+    - name: "SCP ratchet binaries to minions"
+      shell: >
+        scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /home/centos/.ssh/id_testvms /home/centos/gocode/src/ratchet/bin/* centos@{{ hostvars[item]['ansible_host'] }}:/home/centos/ &&
+        ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /home/centos/.ssh/id_testvms centos@{{ hostvars[item]['ansible_host'] }} "sudo mv /home/centos/ratchet* /opt/cni/bin/"
+      with_items: "{{ groups['minions'] }}"
+
+- hosts: all_vms
+  tasks:
+    - name: Template CNI config
+      template:
+        src: ./config.json.j2
+        dest: /etc/cni/net.d/10-mynet.conf

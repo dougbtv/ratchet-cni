@@ -1,0 +1,16 @@
+{
+  "name": "ratchet-demo",
+  "type": "ratchet",
+  "etcd_host": "localhost",
+  "child_path": "/opt/cni/bin/ratchet-child",
+  "delegate": {
+    "name": "cbr0",
+    "type": "flannel",
+    "delegate": {
+      "isDefaultGateway": true
+    }
+  },
+  "boot_network": {
+    "type": "loopback"
+  }
+}
