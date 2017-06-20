@@ -28,7 +28,6 @@ script:
   - go test -v
   - go build
   # Next steps, run it with the CNI docker stuff?
-  - export CNI_PATH=$(pwd)/bin
   - | 
     cat >/tmp/netconf/10-mynet.conf <<EOF
     {
@@ -48,6 +47,10 @@ script:
       }
     }
     EOF
-  - cd /tmp/cni/scripts
+  - cd /tmp/cni/plugins
+  - ./build.sh
+  - cp ~/ratchet-cni/bin/* ./bin/
+  - export CNI_PATH=$(pwd)/bin
+  - cd ../scripts
   - export NETCONFPATH=/tmp/netconf
   - CNI_PATH=$CNI_PATH ./docker-run.sh --rm busybox:latest ifconfig
