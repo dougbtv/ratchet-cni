@@ -27,7 +27,7 @@ script:
   - golint
   - go test -v
   - go build
-  # Next steps, run it with the CNI docker stuff?
+  # Next steps, run it with the CNI docker stuff
   - | 
     cat >/tmp/netconf/10-mynet.conf <<EOF
     {
