@@ -12,21 +12,29 @@ services:
   - docker
 
 before_install:
+  # Get the linter.
   - go get github.com/golang/lint/golint
+  # Clone CNI repo proper
   - git clone https://github.com/containernetworking/cni.git /tmp/cni
+  # Clone the default plugins.
+  - git clone https://github.com/containernetworking/plugins.git /tmp/plugins
+  # Make a dir to store the CNI network configuration.
   - mkdir -p /tmp/netconf
 
 script:
-  # Generally build out everything we need.
+  # Build out ratchet proper.
   - cd ratchet
   - golint
   - go test -v
-  - go build
+  - go build -o ~/bin/ratchet
   - cd ../
+  # Build out the 
   - cd ratchet-child
   - golint
   - go test -v
-  - go build
+  - go build -o ~/bin/ratchet-child
+  # List the binaries
+  - cd ../ && ls -lathr ./bin
   # Next steps, run it with the CNI docker stuff
   - | 
     cat >/tmp/netconf/10-mynet.conf <<EOF
@@ -51,6 +59,6 @@ script:
   - ./build.sh
   - cp ~/ratchet-cni/bin/* ./bin/
   - export CNI_PATH=$(pwd)/bin
-  - cd ../scripts
+  - cd /tmp/cni/scripts
   - export NETCONFPATH=/tmp/netconf
   - CNI_PATH=$CNI_PATH ./docker-run.sh --rm busybox:latest ifconfig
