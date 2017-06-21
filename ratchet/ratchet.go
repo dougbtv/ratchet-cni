@@ -201,16 +201,16 @@ func isMasterplugin(netconf map[string]interface{}) bool {
 func delegateAdd(podif func() string, argif string, netconf map[string]interface{}, onlyMaster bool) (*types.Result, error) {
   netconfBytes, err := json.Marshal(netconf)
   if err != nil {
-    return nil, fmt.Errorf("Multus: error serializing multus delegate netconf: %v", err)
+    return nil, fmt.Errorf("Ratchet: error serializing multus delegate netconf: %v", err)
   }
 
   if os.Setenv("CNI_IFNAME", argif) != nil {
-    return nil, fmt.Errorf("Multus: error in setting CNI_IFNAME")
+    return nil, fmt.Errorf("Ratchet: error in setting CNI_IFNAME")
   }
   
   result, err := invoke.DelegateAdd(netconf["type"].(string), netconfBytes)
   if err != nil {
-    return nil, fmt.Errorf("Multus: error in invoke Delegate add - %q: %v", netconf["type"].(string), err)
+    return nil, fmt.Errorf("Ratchet: error in invoke Delegate add - %q: %v", netconf["type"].(string), err)
   }
   
   return result, nil
@@ -220,22 +220,22 @@ func delegateAdd(podif func() string, argif string, netconf map[string]interface
 func delegateDel(podif func() string, argif string, netconf map[string]interface{}) error {
   netconfBytes, err := json.Marshal(netconf)
   if err != nil {
-    return fmt.Errorf("Multus: error serializing multus delegate netconf: %v", err)
+    return fmt.Errorf("Ratchet: error serializing multus delegate netconf: %v", err)
   }
 
   if !isMasterplugin(netconf) {
     if os.Setenv("CNI_IFNAME", podif()) != nil {
-      return fmt.Errorf("Multus: error in setting CNI_IFNAME")
+      return fmt.Errorf("Ratchet: error in setting CNI_IFNAME")
     }
   } else {
     if os.Setenv("CNI_IFNAME", argif) != nil {
-      return fmt.Errorf("Multus: error in setting CNI_IFNAME")
+      return fmt.Errorf("Ratchet: error in setting CNI_IFNAME")
     }
   }
 
   err = invoke.DelegateDel(netconf["type"].(string), netconfBytes)
   if err != nil {
-    return fmt.Errorf("Multus: error in invoke Delegate del - %q: %v", netconf["type"].(string), err)
+    return fmt.Errorf("Ratchet: error in invoke Delegate del - %q: %v", netconf["type"].(string), err)
   }
 
   return err
@@ -244,7 +244,7 @@ func delegateDel(podif func() string, argif string, netconf map[string]interface
 func clearPlugins(mIdx int, pIdx int, argIfname string, delegates []map[string]interface{}) error {
 
   if os.Setenv("CNI_COMMAND", "DEL") != nil {
-    return fmt.Errorf("Multus: error in setting CNI_COMMAND to DEL")
+    return fmt.Errorf("Ratchet: error in setting CNI_COMMAND to DEL")
   }
 
   podifName := getifname()
