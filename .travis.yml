@@ -23,16 +23,17 @@ before_install:
 
 script:
   # Build out ratchet proper.
+  - mkdir bin
   - cd ratchet
   - golint
   - go test -v
-  - go build -o ~/bin/ratchet
+  - go build -o ~/ratchet-cni/bin/ratchet
   - cd ../
   # Build out the 
   - cd ratchet-child
   - golint
   - go test -v
-  - go build -o ~/bin/ratchet-child
+  - go build -o ~/ratchet-cni/bin/ratchet-child
   # List the binaries
   - cd ../ && ls -lathr ./bin
   # Next steps, run it with the CNI docker stuff
@@ -55,7 +56,7 @@ script:
       }
     }
     EOF
-  - cd /tmp/cni/plugins
+  - cd /tmp/plugins
   - ./build.sh
   - cp ~/ratchet-cni/bin/* ./bin/
   - export CNI_PATH=$(pwd)/bin
