@@ -27,6 +27,16 @@
           - "--exclude 'bin'"
         #   - 'ssh -o ProxyCommand="ssh -W %h:%p root@192.168.1.119"'
 
+    - name: "Ensure bin directory is gone"
+      file:
+        dest: "/home/centos/gocode/src/ratchet/bin/"
+        state: absent
+
+    - name: "Ensure bin directory is there"
+      file:
+        dest: "/home/centos/gocode/src/ratchet/bin/"
+        state: directory
+
     - name: "Build Ratchet"
       shell: >
         ./build.sh
