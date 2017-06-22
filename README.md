@@ -38,6 +38,7 @@ Here's a sample configuration that uses Flannel for pods which are not eligible 
   "name": "ratchet-demo",
   "type": "ratchet",
   "etcd_host": "localhost",
+  "etcd_port": "2379",
   "child_path": "/opt/cni/bin/ratchet-child",
   "delegate": {
     "name": "cbr0",
@@ -117,6 +118,18 @@ Only one pod in the pair can have `ratchet.primary: "true"`.
 The pod named `primary-pod` will be assigned `192.168.2.100` IP address on an interface named `in1`, and the pod named `pair-pod` will be assigned the IP of `192.168.2.101` on an interface named `in2` -- interfaces `in1` and `in2` are two ends of a veth pair as created by Koko. Right now these are in a statically defined `/24` network, that will be improved in the future.
 
 ...More explanation to come.
+
+## Compiling and deploying on a remote Kubernetes
+
+In the `./utils` directory there is an Ansible playbook to allow you to sync your current directory with a remote master, and compile ratchet there. This allows you to edit your code locally, and then deploy ratchet elsewhere. Primarily, edit the `remote.inventory` file to match your remote environment.
+
+You can synchronize and build your source with:
+
+```
+ansible-playbook -i remote.inventory sync-and-build.yml
+```
+
+
 
 ## Behind the name
 

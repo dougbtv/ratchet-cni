@@ -1,3 +1,4 @@
 ratchet
 reference/
 bin/
+*.retry

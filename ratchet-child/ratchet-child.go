@@ -41,35 +41,35 @@ import (
   "github.com/coreos/etcd/client"
 )
 
-const ALIVE_WAIT_SECONDS = 1
-const ALIVE_WAIT_RETRIES = 60
-const DELAY_KOKO_SECONDS = 1
+const aliveWaitSeconds = 1
+const aliveWaitRetries = 60
+const delayKokoSeconds = 1
 const defaultCNIDir = "/var/lib/cni/multus"
-const DEBUG = true
-const PERFORM_DELETE = false
+const debug = true
 
 var kapi client.KeysAPI
 
 var masterpluginEnabled bool
 
+// LinkInfo is a detail of the link we're going to create.
 type LinkInfo struct {
-  Pod_name string
-  Target_pod string
-  Target_container string
-  Public_ip string
-  Local_ip string
-  Local_ifname string
-  Pair_name string
-  Pair_ip string
-  Pair_ifname string
+  PodName string
+  TargetPod string
+  TargetContainer string
+  PublicIP string
+  LocalIP string
+  LocalIFName string
+  PairName string
+  PairIP string
+  PairIFName string
   Primary string
 }
 
 func isContainerAlive(containername string) bool {
   isalive := false
 
-  target_key := "/ratchet/byname/" + containername
-  _, err := kapi.Get(context.Background(), target_key, nil)
+  targetKey := "/ratchet/byname/" + containername
+  _, err := kapi.Get(context.Background(), targetKey, nil)
   if err != nil {
 
       // ErrorCodeKeyNotFound = Key not found, that's exactly the one we know is good.
@@ -77,7 +77,7 @@ func isContainerAlive(containername string) bool {
       // Passing along on this.
       /*
       if (err != client.ErrorCodeKeyNotFound) {
-        logger.Println(fmt.Errorf("isContainerAlive - possible missing value %s: %v", target_key, err))
+        logger.Println(fmt.Errorf("isContainerAlive - possible missing value %s: %v", targetKey, err))
       }
       */
 
@@ -90,25 +90,11 @@ func isContainerAlive(containername string) bool {
 
 }
 
-func getContainerIDByName(containername string) (error, string) {
-  
-  target_key := "/ratchet/byname/" + containername
-  resp_containerid, err := kapi.Get(context.Background(), target_key, nil)
-  if err != nil {
-
-      return fmt.Errorf("Error picking up container id by name: %v",containername), ""
-
-    } else {
-      return nil, resp_containerid.Node.Value;
-    }
-
-}
-
 func amIAlive(containerid string) bool {
   isalive := false
 
-  target_key := "/ratchet/" + containerid + "/pod_name"
-  _, err := kapi.Get(context.Background(), target_key, nil)
+  targetKey := "/ratchet/" + containerid + "/pod_name"
+  _, err := kapi.Get(context.Background(), targetKey, nil)
   if err != nil {
 
       // ErrorCodeKeyNotFound = Key not found, that's exactly the one we know is good.
@@ -116,7 +102,7 @@ func amIAlive(containerid string) bool {
       // Passing along on this.
       /*
       if (err != client.ErrorCodeKeyNotFound) {
-        logger.Println(fmt.Errorf("isContainerAlive - possible missing value %s: %v", target_key, err))
+        logger.Println(fmt.Errorf("isContainerAlive - possible missing value %s: %v", targetKey, err))
       }
       */
 
@@ -148,35 +134,35 @@ func getEtcdMetaData(containerid string, setalive bool) (map[string]string) {
   all["primary"] = ""
   all["isalive"] = ""
 
-  for k, _ := range all { 
+  for k := range all { 
     // Print all possibilities...
     // logger(fmt.Sprintf("key[%s] value[%s]\n", k, v))
 
     // get a key's value
     // logger.Print("Getting '/ratchet/" + containerid + "/" + k + "' key value")
     getcfg := &client.GetOptions{Recursive: true}
-    target_key := "/ratchet/" + containerid + "/" + k
-    message_resp, err := kapi.Get(context.Background(), target_key, getcfg)
+    targetKey := "/ratchet/" + containerid + "/" + k
+    messageResp, err := kapi.Get(context.Background(), targetKey, getcfg)
     if err != nil {
 
       // For now, this seems to be just the missing values.
       // ...which are generally fine.
-      // logger.Println(fmt.Errorf("possible missing value %s: %v", target_key, err))
+      // logger.Println(fmt.Errorf("possible missing value %s: %v", targetKey, err))
 
     } else {
       // print common key info
-      // logger(fmt.Sprintf("Get is done. Metadata is %q\n", message_resp))
+      // logger(fmt.Sprintf("Get is done. Metadata is %q\n", messageResp))
       // print value
 
-      // dump_resp := spew.Sdump(message_resp)
-      // os.Stderr.WriteString("DOUG !trace message_resp ----------\n" + dump_resp)
+      // dump_resp := spew.Sdump(messageResp)
+      // os.Stderr.WriteString("DOUG !trace messageResp ----------\n" + dump_resp)
 
       // dump_adata := spew.Sdump(adata)
       // os.Stderr.WriteString("DOUG !trace adata ----------\n" + dump_adata)
 
-      all[k] = message_resp.Node.Value;
+      all[k] = messageResp.Node.Value;
 
-      // logger(fmt.Sprintf("%q key has %q value\n", message_resp.Node.Key, message_resp.Node.Value))
+      // logger(fmt.Sprintf("%q key has %q value\n", messageResp.Node.Key, messageResp.Node.Value))
     }
 
 
@@ -208,9 +194,6 @@ func associateIDEtcd (containerid string,podname string) error {
   if err != nil {
     log.Fatal(err)
     return err
-  } else {
-    // print common key info
-    // log.Printf("Set is done. Metadata is %q\n", resp)
   }
 
   return nil
@@ -219,8 +202,8 @@ func associateIDEtcd (containerid string,podname string) error {
 
 func isPairContainerAlive(podname string) string {
   
-  target_key := "/ratchet/association/" + podname
-  resp_containerid, err := kapi.Get(context.Background(), target_key, nil)
+  targetKey := "/ratchet/association/" + podname
+  respContainerID, err := kapi.Get(context.Background(), targetKey, nil)
   if err != nil {
 
       // ErrorCodeKeyNotFound = Key not found, that's exactly the one we know is good.
@@ -228,13 +211,13 @@ func isPairContainerAlive(podname string) string {
       // Passing along on this.
       /*
       if (err != client.ErrorCodeKeyNotFound) {
-        logger.Println(fmt.Errorf("isPairContainerAlive - possible missing value %s: %v", target_key, err))
+        logger.Println(fmt.Errorf("isPairContainerAlive - possible missing value %s: %v", targetKey, err))
       }
       */
 
     } else {
       // no error? must be there.
-      return resp_containerid.Node.Value;
+      return respContainerID.Node.Value;
     }
 
   return ""
@@ -248,7 +231,7 @@ func ratchet(argif string,containerid string, linki LinkInfo) error {
   // We no longer care if we're alive anymore. 
   // If this is up, we can assume the infra container is good to go.
   // So all we need to do is associate our containerid with our name.
-  associateIDEtcd(containerid,linki.Pod_name)
+  associateIDEtcd(containerid,linki.PodName)
 
   // If it's determined that we're alive, now we can see if we're primary.
   // If we're not primary, we can just exit right now.
@@ -256,53 +239,53 @@ func ratchet(argif string,containerid string, linki LinkInfo) error {
 
   if (linki.Primary != "true") {
     // Ok, we're not primary. So... time to exit.
-    if (DEBUG) {
-      logger(fmt.Sprintf("Normal termination, this container is not primary (name: %v, containerid: %v, primary: %v)",linki.Pod_name,containerid,linki.Primary))
+    if (debug) {
+      logger(fmt.Sprintf("Normal termination, this container is not primary (name: %v, containerid: %v, primary: %v)",linki.PodName,containerid,linki.Primary))
     }
 
     return nil
   }
 
   // Check to see there's a valid pair name.
-  if (len(linki.Pair_name) <= 1) {
+  if (len(linki.PairName) <= 1) {
     // That's not good.
-    return fmt.Errorf("Pair name appears to be invalid: %v", linki.Pair_name)
+    return fmt.Errorf("Pair name appears to be invalid: %v", linki.PairName)
   }
 
   // Now we want to check and see if the pair container is alive.
   // So it's time to go into a loop and do that.
   // if the pair container is alive -- bada bing, we can execute koko.
 
-  var pair_containerid string
+  var pairContainerID string
   tries := 0
 
   for {
     
-    pair_containerid = isPairContainerAlive(linki.Pair_name)
+    pairContainerID = isPairContainerAlive(linki.PairName)
 
-    if (len(pair_containerid) >= 1) {
+    if (len(pairContainerID) >= 1) {
       // We found it.
       break;
     }
 
     tries++
 
-    if (DEBUG) {
-      logger(fmt.Sprintf("Is pair alive? pair_name: %v (%v retries)\n",linki.Pair_name,tries))
+    if (debug) {
+      logger(fmt.Sprintf("Is pair alive? pair_name: %v (%v retries)\n",linki.PairName,tries))
     }
 
     // We either timeout, or, we're alive.
-    if (tries >= ALIVE_WAIT_RETRIES) {
+    if (tries >= aliveWaitRetries) {
       return fmt.Errorf("Timeout: could not find that pair container is alive via metadata in %v tries", tries)
     }
 
     // Wait for however long.
-    time.Sleep(ALIVE_WAIT_SECONDS * time.Second)
+    time.Sleep(aliveWaitSeconds * time.Second)
 
   }
 
   // Now, we can probably rock out all the 
-  logger(fmt.Sprintf("And my pair's container id is: %v",pair_containerid))
+  logger(fmt.Sprintf("And my pair's container id is: %v",pairContainerID))
 
   // dump_my_meta := spew.Sdump(my_meta)
   // os.Stderr.WriteString("The containerid: " + containerid + "\n")
@@ -314,22 +297,22 @@ func ratchet(argif string,containerid string, linki LinkInfo) error {
   // koko.VethCreator("foo","192.168.2.100/24","in1","bar","192.168.2.101/24","in2")
 
   // What about a healthy delay?
-  logger(fmt.Sprintf("Pre koko-delay, %v SECONDS",DELAY_KOKO_SECONDS))
-  time.Sleep(DELAY_KOKO_SECONDS * time.Second)
+  logger(fmt.Sprintf("Pre koko-delay, %v SECONDS",delayKokoSeconds))
+  time.Sleep(delayKokoSeconds * time.Second)
 
 
-  koko_err := koko.VethCreator(
+  kokoErr := koko.VethCreator(
     containerid,
-    linki.Local_ip + "/24",
-    linki.Local_ifname,
-    pair_containerid,
-    linki.Pair_ip + "/24",
-    linki.Pair_ifname,
+    linki.LocalIP + "/24",
+    linki.LocalIFName,
+    pairContainerID,
+    linki.PairIP + "/24",
+    linki.PairIFName,
   )
 
-  if (koko_err != nil) {
-    logger(fmt.Sprintf("koko error in child: %v",koko_err))
-    return koko_err
+  if (kokoErr != nil) {
+    logger(fmt.Sprintf("koko error in child: %v",kokoErr))
+    return kokoErr
   }
 
   logger("Koko appears to have completed with success.")
@@ -342,18 +325,23 @@ func logger(input string) {
 
   // exec_command := 
   // os.Stderr.WriteString("!trace alive The containerid: |" + exec_command + "|||\n")
-  cmd := exec.Command("/bin/bash", "-c", "echo \"ratchet-child: " + input + "\" | systemd-cat")
+  
+  // This is a total hack.
+  // cmd := exec.Command("/bin/bash", "-c", "echo \"ratchet-child: " + input + "\" | systemd-cat")
+
+  // This is even MORE of a hack.
+  cmd := exec.Command("/bin/bash", "-c", "echo \"ratchet-child: " + input + "\" >> /tmp/ratchet-child.log")
   cmd.Start()
 
 }
 
 
-func initEtcd(etcd_host string) {
+func initEtcd(etcdHost string, etcdPort string) {
 
   // Make a connection to etcd. Then we reuse the "kapi"
 
   cfg := client.Config{
-    Endpoints:               []string{"http://" + etcd_host + ":2379"},
+    Endpoints:               []string{"http://" + etcdHost + ":" + etcdPort},
     Transport:               client.DefaultTransport,
     // set timeout per request to fail fast when the target endpoint is unavailable
     HeaderTimeoutPerRequest: time.Second,
@@ -369,9 +357,9 @@ func main() {
   
   // arg := os.Args[3]
 
-  initEtcd(os.Args[3])
+  initEtcd(os.Args[3],os.Args[4])
 
-  if (DEBUG) {
+  if (debug) {
     logger("[LOGGING ENABLED]")
     logger(fmt.Sprintf("Interface: %v",os.Args[1]))
     logger(fmt.Sprintf("ContainerID: %v",os.Args[2]))
@@ -397,16 +385,16 @@ func main() {
   // Apr 29 00:43:30 cni unknown[14534]: ratchet-child: arg[11]: 192.168.2.101
 
   linki := LinkInfo{}
-  linki.Pod_name = os.Args[4]
-  linki.Target_pod = os.Args[5]
-  linki.Target_container = os.Args[6]
-  linki.Public_ip = os.Args[7]
-  linki.Local_ip = os.Args[8]
-  linki.Local_ifname = os.Args[9]
-  linki.Pair_name = os.Args[10]
-  linki.Pair_ip = os.Args[11]
-  linki.Pair_ifname = os.Args[12]
-  linki.Primary = os.Args[13]
+  linki.PodName = os.Args[5]
+  linki.TargetPod = os.Args[6]
+  linki.TargetContainer = os.Args[7]
+  linki.PublicIP = os.Args[8]
+  linki.LocalIP = os.Args[9]
+  linki.LocalIFName = os.Args[10]
+  linki.PairName = os.Args[11]
+  linki.PairIP = os.Args[12]
+  linki.PairIFName = os.Args[13]
+  linki.Primary = os.Args[14]
 
   err := ratchet(os.Args[1],os.Args[2],linki)
   if (err != nil) {

@@ -1,0 +1,86 @@
+- hosts: master
+  tasks:
+    - name: "Create dir for cni"
+      file: 
+        dest: "/home/centos/cni"
+        state: directory
+
+    - name: "Clone CNI repo"
+      git:
+        repo: https://github.com/containernetworking/cni.git
+        dest: "/home/centos/cni/cni"
+        force: yes
+
+    - name: "Install jq binary from url"
+      get_url:
+        url: https://github.com/stedolan/jq/releases/download/jq-1.5/jq-linux64
+        dest: /usr/bin/jq
+        mode: 0755
+
+    # - name: "Clone CNI plugins repo"
+    #   git:
+    #     repo: https://github.com/containernetworking/plugins.git
+    #     dest: "/home/centos/cni/plugins"
+
+    # - name: "Compile cni plugins"
+    #   shell: >
+    #     ./build.sh
+    #   args:
+    #     chdir: /home/centos/cni/plugins
+    #     creates: /home/centos/cni/plugins/bin/flannel
+
+    #   image: "quay.io/coreos/etcd"
+    # ports: 
+    # command: >
+
+    - name: Copy files necessary for docker run
+      copy:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        mode: 0755
+      with_items:
+        - src: ../conf/docker-run-pair.sh
+          dest: /home/centos/cni/cni/scripts/docker-run-pair.sh
+        - src: ../conf/docker-run-primary.sh
+          dest: /home/centos/cni/cni/scripts/docker-run-primary.sh
+        - src: ../conf/primary.label
+          dest: /home/centos/cni/cni/scripts/primary.label
+        - src: ../conf/pair.label
+          dest: /home/centos/cni/cni/scripts/pair.label
+        # - src: ../conf/10-mynet.conf
+        #   dest: /etc/cni/net.d/10-mynet.conf
+
+    - name: Start etcd container
+      shell: >
+        docker stop etcd; docker rm etcd;
+        docker run -dt --name etcd
+        -p 5656:2379
+        quay.io/coreos/etcd
+        etcd
+        -name etcd0
+        -advertise-client-urls http://172.17.0.1:2379,http://172.17.0.1:4001
+        -listen-client-urls http://0.0.0.0:2379,http://0.0.0.0:4001
+        -initial-advertise-peer-urls http://172.17.0.1:2380
+        -listen-peer-urls http://0.0.0.0:2380
+        -initial-cluster-token etcd-cluster-1
+        -initial-cluster etcd0=http://172.17.0.1:2380
+        -initial-cluster-state new
+      ignore_errors: yes
+
+    - name: Perform docker run
+      shell: "{{ item }}"
+      environment:
+        NETCONFPATH: /etc/cni/net.d
+        CNI_PATH: /opt/cni/bin/
+      with_items:
+        - >
+          docker kill $(docker ps | grep -iP "pair|primary" | awk '{print $1}')
+        - > 
+          docker rm $(docker ps -a | grep -iP "pair|primary" | awk '{print $1}')
+        - "./docker-run-primary.sh --name primary -dt busybox /bin/sleep 10000"
+        - "./docker-run-pair.sh --name pair -dt busybox /bin/sleep 10000"
+      ignore_errors: yes
+      # need async to let background processes run --> https://ansibledaily.com/execute-detached-process-with-ansible/
+      async: 2592000
+      args:
+        chdir: /home/centos/cni/cni/scripts/

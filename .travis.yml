@@ -1,0 +1,105 @@
+language: go
+
+go:
+  - 1.7.x
+
+sudo: required
+
+# env:
+#   - CNI_PATH=/opt/
+
+services:
+  - docker
+
+before_install:
+  # Get the linter.
+  - go get github.com/golang/lint/golint
+  # Clone CNI repo proper
+  - git clone https://github.com/containernetworking/cni.git /tmp/cni
+  # Clone the default plugins.
+  - git clone https://github.com/containernetworking/plugins.git /tmp/plugins
+  # Make a dir to store the CNI network configuration.
+  - mkdir -p /tmp/netconf
+
+script:
+  # Build out ratchet proper.
+  - pwd
+  - mkdir bin
+  - cd ratchet
+  - golint
+  - go test -v
+  - go build -o ~/gopath/src/github.com/dougbtv/ratchet-cni/bin/ratchet
+  - cd ../
+  # Build out the child.
+  - cd ratchet-child
+  - golint
+  - go test -v
+  - go build -o ~/gopath/src/github.com/dougbtv/ratchet-cni/bin/ratchet-child
+  # List the binaries
+  - cd ../ && ls -lathr ./bin
+
+  # Build the default plugins (is this necessary? Maybe.)
+  - cd /tmp/plugins
+  - ./build.sh
+  - cp ~/gopath/src/github.com/dougbtv/ratchet-cni/bin/* ./bin/
+  - export CNI_PATH=$(pwd)/bin
+
+  # Setup for running with CNI docker.
+  - | 
+    cat >/tmp/netconf/10-mynet.conf <<EOF
+    {
+      "name": "ratchet-demo",
+      "type": "ratchet",
+      "etcd_host": "localhost",
+      "etcd_port": "5656",
+      "child_path": "$CNI_PATH/ratchet-child",
+      "delegate": {
+        "name": "cbr0",
+        "type": "flannel",
+        "delegate": {
+          "isDefaultGateway": true
+        }
+      },
+      "boot_network": {
+        "type": "loopback"
+      }
+    }
+    EOF
+ 
+  # Start etcd.
+  - >
+    docker run -dt --name etcd
+    -p 5656:2379
+    quay.io/coreos/etcd
+    etcd
+    -name etcd0
+    -advertise-client-urls http://172.17.0.1:2379,http://172.17.0.1:4001
+    -listen-client-urls http://0.0.0.0:2379,http://0.0.0.0:4001
+    -initial-advertise-peer-urls http://172.17.0.1:2380
+    -listen-peer-urls http://0.0.0.0:2380
+    -initial-cluster-token etcd-cluster-1
+    -initial-cluster etcd0=http://172.17.0.1:2380
+
+  # Run CNI docker.
+  - cd /tmp/cni/scripts
+  - cp ~/gopath/src/github.com/dougbtv/ratchet-cni/conf/* .
+  - export NETCONFPATH=/tmp/netconf
+  - export CNI_PATH=$CNI_PATH 
+  # Test systemd-cat
+  # Try to run these in the same shebang?
+  - sudo ./docker-run-primary.sh --name primary -dt busybox /bin/sleep 10000 && sudo ./docker-run-pair.sh --name pair -dt busybox /bin/sleep 10000
+  
+  # Look at logs and docker ps
+  - sleep 5
+  - cat /tmp/ratchet-child.log
+  - docker ps
+  
+  # Show all the interfaces
+  - docker exec -it primary ifconfig 
+  - docker exec -it pair ifconfig
+  # Validate that in1 and in2 are present
+  - docker exec -it primary ifconfig | grep in1
+  - docker exec -it pair ifconfig | grep in2
+  # Ping each IP address
+  - docker exec -it primary ping -c 5 192.168.2.101
+  - docker exec -it pair ping -c 5 192.168.2.100

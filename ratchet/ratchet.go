@@ -22,7 +22,6 @@ package main
 import (
   "encoding/json"
   "fmt"
-  "time"
   "log"
   "io/ioutil"
   // "reflect"
@@ -41,11 +40,11 @@ import (
   "github.com/coreos/etcd/client"
 )
 
-const ALIVE_WAIT_SECONDS = 1
-const ALIVE_WAIT_RETRIES = 120
 const defaultCNIDir = "/var/lib/cni/multus"
+// DEBUG Set to enable some debugging output
 const DEBUG = true
-const PERFORM_DELETE = false
+// PerformDelete tell us to actually do anything on CNI delete instruction (not implemented, yet)
+const PerformDelete = false
 
 var kapi client.KeysAPI
 
@@ -53,26 +52,29 @@ var logger = log.New(os.Stderr, "", 0)
 
 var masterpluginEnabled bool
 
+// NetConf is our network configuration as passed in as json
 type NetConf struct {
   types.NetConf
   CNIDir    string                    `json:"cniDir"`
   Delegate map[string]interface{}     `json:"delegate"`
-  Etcd_host string                    `json:"etcd_host"`
-  Use_labels bool                     `json:"use_labels"`
-  Child_path string                   `json:"child_path"`
-  Boot_network map[string]interface{} `json:"boot_network"`
+  EtcdHost string                    `json:"etcd_host"`
+  EtcdPort string                    `json:"etcd_port"`
+  UseLabels bool                     `json:"use_labels"`
+  ChildPath string                   `json:"child_path"`
+  BootNetwork map[string]interface{} `json:"boot_network"`
 }
 
+// LinkInfo defines the paid of links we're going to create
 type LinkInfo struct {
-  Pod_name string
-  Target_pod string
-  Target_container string
-  Public_ip string
-  Local_ip string
-  Local_ifname string
-  Pair_name string
-  Pair_ip string
-  Pair_ifname string
+  PodName string
+  TargetPod string
+  TargetContainer string
+  PublicIP string
+  LocalIP string
+  LocalIFName string
+  PairName string
+  PairIP string
+  PairIFName string
   Primary string
 }
 
@@ -196,44 +198,44 @@ func isMasterplugin(netconf map[string]interface{}) bool {
   return false
 }
 
-func delegateAdd(podif func() string, argif string, netconf map[string]interface{}, onlyMaster bool) (error, *types.Result) {
+func delegateAdd(podif func() string, argif string, netconf map[string]interface{}, onlyMaster bool) (*types.Result, error) {
   netconfBytes, err := json.Marshal(netconf)
   if err != nil {
-    return fmt.Errorf("Multus: error serializing multus delegate netconf: %v", err), nil
+    return nil, fmt.Errorf("Ratchet: error serializing multus delegate netconf: %v", err)
   }
 
   if os.Setenv("CNI_IFNAME", argif) != nil {
-    return fmt.Errorf("Multus: error in setting CNI_IFNAME"), nil
+    return nil, fmt.Errorf("Ratchet: error in setting CNI_IFNAME")
   }
   
   result, err := invoke.DelegateAdd(netconf["type"].(string), netconfBytes)
   if err != nil {
-    return fmt.Errorf("Multus: error in invoke Delegate add - %q: %v", netconf["type"].(string), err), nil
+    return nil, fmt.Errorf("Ratchet: error in invoke Delegate add - %q: %v", netconf["type"].(string), err)
   }
   
-  return nil, result
+  return result, nil
   
 }
 
 func delegateDel(podif func() string, argif string, netconf map[string]interface{}) error {
   netconfBytes, err := json.Marshal(netconf)
   if err != nil {
-    return fmt.Errorf("Multus: error serializing multus delegate netconf: %v", err)
+    return fmt.Errorf("Ratchet: error serializing multus delegate netconf: %v", err)
   }
 
   if !isMasterplugin(netconf) {
     if os.Setenv("CNI_IFNAME", podif()) != nil {
-      return fmt.Errorf("Multus: error in setting CNI_IFNAME")
+      return fmt.Errorf("Ratchet: error in setting CNI_IFNAME")
     }
   } else {
     if os.Setenv("CNI_IFNAME", argif) != nil {
-      return fmt.Errorf("Multus: error in setting CNI_IFNAME")
+      return fmt.Errorf("Ratchet: error in setting CNI_IFNAME")
     }
   }
 
   err = invoke.DelegateDel(netconf["type"].(string), netconfBytes)
   if err != nil {
-    return fmt.Errorf("Multus: error in invoke Delegate del - %q: %v", netconf["type"].(string), err)
+    return fmt.Errorf("Ratchet: error in invoke Delegate del - %q: %v", netconf["type"].(string), err)
   }
 
   return err
@@ -242,7 +244,7 @@ func delegateDel(podif func() string, argif string, netconf map[string]interface
 func clearPlugins(mIdx int, pIdx int, argIfname string, delegates []map[string]interface{}) error {
 
   if os.Setenv("CNI_COMMAND", "DEL") != nil {
-    return fmt.Errorf("Multus: error in setting CNI_COMMAND to DEL")
+    return fmt.Errorf("Ratchet: error in setting CNI_COMMAND to DEL")
   }
 
   podifName := getifname()
@@ -284,8 +286,8 @@ func ratchet(netconf *NetConf,argif string,containerid string) error {
     return fmt.Errorf("Ratchet delegate: Err in delegate conf: %v", err)
   }
 
-  if err := checkDelegate(netconf.Boot_network); err != nil {
-    return fmt.Errorf("Ratchet Boot_network: Err in delegate conf: %v", err)
+  if err := checkDelegate(netconf.BootNetwork); err != nil {
+    return fmt.Errorf("Ratchet BootNetwork: Err in delegate conf: %v", err)
   }
 
   podifName := getifname()
@@ -293,9 +295,9 @@ func ratchet(netconf *NetConf,argif string,containerid string) error {
 
   // ------------------------ Check label
   ctx := context.Background()
-  cli, err_docker := dockerclient.NewEnvClient()
-  if err_docker != nil {
-    panic(err_docker)
+  cli, errDocker := dockerclient.NewEnvClient()
+  if errDocker != nil {
+    panic(errDocker)
   }
 
   cli.UpdateClientVersion("1.24")
@@ -309,11 +311,11 @@ func ratchet(netconf *NetConf,argif string,containerid string) error {
   var err error
   var r *types.Result
 
-  if _, use_ratchet := json.Config.Labels["ratchet"]; use_ratchet {
+  if _, useRatchet := json.Config.Labels["ratchet"]; useRatchet {
 
     logger.Println("USE RATCHET ----------------------->>>>>>>>>>>>>>>")
     // We want to use the ratchet "boot_network"
-    err, r = delegateAdd(podifName, argif, netconf.Boot_network, false)
+    r, err = delegateAdd(podifName, argif, netconf.BootNetwork, false)
     if err != nil {
       logger.Printf("ratchet delegateAdd boot_network error ----------%v",err)
       return err
@@ -325,7 +327,7 @@ func ratchet(netconf *NetConf,argif string,containerid string) error {
     // But, now, we just use the delegate.
     // var mIndex int
     logger.Println("DO NOT USE RATCHET (passthrough)----------------------->>>>>>>>>>>>>>>")
-    err, r = delegateAdd(podifName, argif, netconf.Delegate, false)
+    r, err = delegateAdd(podifName, argif, netconf.Delegate, false)
     if err != nil {
       logger.Printf("ratchet delegateAdd passthrough error ----------%v",err)
       return err
@@ -340,43 +342,46 @@ func ratchet(netconf *NetConf,argif string,containerid string) error {
   // Populate all the possible link info.
 
   linki := LinkInfo{}
-  linki.Pod_name = json.Config.Labels["ratchet.pod_name"]
-  linki.Target_pod = json.Config.Labels["ratchet.target_pod"]
-  linki.Target_container = json.Config.Labels["ratchet.target_container"]
-  linki.Public_ip = json.Config.Labels["ratchet.public_ip"]
-  linki.Local_ip = json.Config.Labels["ratchet.local_ip"]
-  linki.Local_ifname = json.Config.Labels["ratchet.local_ifname"]
-  linki.Pair_name = json.Config.Labels["ratchet.pair_name"]
-  linki.Pair_ip = json.Config.Labels["ratchet.pair_ip"]
-  linki.Pair_ifname = json.Config.Labels["ratchet.pair_ifname"]
+  linki.PodName = json.Config.Labels["ratchet.pod_name"]
+  linki.TargetPod = json.Config.Labels["ratchet.target_pod"]
+  linki.TargetContainer = json.Config.Labels["ratchet.target_container"]
+  linki.PublicIP = json.Config.Labels["ratchet.public_ip"]
+  linki.LocalIP = json.Config.Labels["ratchet.local_ip"]
+  linki.LocalIFName = json.Config.Labels["ratchet.local_ifname"]
+  linki.PairName = json.Config.Labels["ratchet.pair_name"]
+  linki.PairIP = json.Config.Labels["ratchet.pair_ip"]
+  linki.PairIFName = json.Config.Labels["ratchet.pair_ifname"]
   linki.Primary = json.Config.Labels["ratchet.primary"]
 
-  dump_linki := spew.Sdump(linki)
-  logger.Printf("DOUG !trace linki ----------%v\n",dump_linki)
+  dumpLinki := spew.Sdump(linki)
+  logger.Printf("...............DOUG !trace linki ----------%v\n",dumpLinki)
 
   // Spawn external process.
   // ...pass tons of link info along with some basics.
 
-  // logger.Printf("executing path: %v / argif: %v / containerID: %v / etcd_host: %v",netconf.Child_path,argif,containerid,netconf.Etcd_host);
-  // exec_string := netconf.Child_path + " " + argif + " " + containerid + " " + netconf.Etcd_host
+  logger.Printf("executing path: %v / argif: %v / containerID: %v / etcd_host: %v",netconf.ChildPath,argif,containerid,netconf.EtcdHost);
+  // exec_string := netconf.ChildPath + " " + argif + " " + containerid + " " + netconf.EtcdHost
   // logger.Printf("executing path composite: %v",exec_string);
   cmd := exec.Command(
-    netconf.Child_path,       // 0
+    netconf.ChildPath,       // 0
     argif,                    // 1
     containerid,
-    netconf.Etcd_host,
-    linki.Pod_name,
-    linki.Target_pod,
-    linki.Target_container,
-    linki.Public_ip,
-    linki.Local_ip,
-    linki.Local_ifname,
-    linki.Pair_name,
-    linki.Pair_ip,
-    linki.Pair_ifname,
+    netconf.EtcdHost,
+    netconf.EtcdPort,
+    linki.PodName,
+    linki.TargetPod,
+    linki.TargetContainer,
+    linki.PublicIP,
+    linki.LocalIP,
+    linki.LocalIFName,
+    linki.PairName,
+    linki.PairIP,
+    linki.PairIFName,
     linki.Primary,
   )
   cmd.Start()
+
+  logger.Println("COMPLETE RATCHET CHILD???? ----------------------->>>>>>>>>>>>>>>")
 
   return printResults(r)
 
@@ -409,7 +414,7 @@ func cmdDel(args *skel.CmdArgs) error {
     return err
   }
 
-  if (PERFORM_DELETE) {
+  if (PerformDelete) {
     result = ratchet(in,args.IfName,args.ContainerID)
   }
 
@@ -425,23 +430,6 @@ func versionInfo(args *skel.CmdArgs) error {
   fmt.Fprintln(os.Stderr, "Version v0.0.0")
   return result
 
-}
-
-func initEtcd(etcd_host string) {
-
-  // Make a connection to etcd. Then we reuse the "kapi"
-
-  cfg := client.Config{
-    Endpoints:               []string{"http://" + etcd_host + ":2379"},
-    Transport:               client.DefaultTransport,
-    // set timeout per request to fail fast when the target endpoint is unavailable
-    HeaderTimeoutPerRequest: time.Second,
-  }
-  c, err := client.New(cfg)
-  if err != nil {
-    log.Fatal(err)
-  }
-  kapi = client.NewKeysAPI(c)
 }
 
 func main() {
