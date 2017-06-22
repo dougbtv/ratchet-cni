@@ -85,7 +85,9 @@ script:
   - export NETCONFPATH=/tmp/netconf
   - export CNI_PATH=$CNI_PATH 
   - sudo ./docker-run-primary.sh --name primary -dt busybox /bin/sleep 10000
+  - sleep 1
   - sudo ./docker-run-pair.sh --name pair -dt busybox /bin/sleep 10000
+  - journalctl  -n150 --no-pager
   # Show all the interfaces
   - docker exec -it primary ifconfig 
   - docker exec -it pair ifconfig
