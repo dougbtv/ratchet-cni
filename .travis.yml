@@ -43,10 +43,11 @@ script:
       "name": "ratchet-demo",
       "type": "ratchet",
       "etcd_host": "localhost",
+      "etcd_port": "5656",
       "child_path": "/opt/cni/bin/ratchet-child",
       "delegate": {
         "name": "cbr0",
-        "type": "loopback",
+        "type": "flannel",
         "delegate": {
           "isDefaultGateway": true
         }
@@ -56,28 +57,40 @@ script:
       }
     }
     EOF
+
+  # Build the default plugins (is this necessary? Maybe.)
   - cd /tmp/plugins
   - ./build.sh
   - cp ~/ratchet-cni/bin/* ./bin/
   - export CNI_PATH=$(pwd)/bin
-  # 
-    #   image: "quay.io/coreos/etcd"
-    # ports: 
-    #   - "4001:4001"
-    #   - "2380:2380"
-    #   - "2379:2379"
-    # command: >
-    #   etcd
-    #   -name etcd0
-    #   -advertise-client-urls http://172.17.0.1:2379,http://172.17.0.1:4001
-    #   -listen-client-urls http://0.0.0.0:2379,http://0.0.0.0:4001
-    #   -initial-advertise-peer-urls http://172.17.0.1:2380
-    #   -listen-peer-urls http://0.0.0.0:2380
-    #   -initial-cluster-token etcd-cluster-1
-    #   -initial-cluster etcd0=http://172.17.0.1:2380
-    #   -initial-cluster-state new
+ 
+  # Start etcd.
+  - >
+    docker run -dt --name etcd
+    -p 5656:2379
+    quay.io/coreos/etcd
+    etcd
+    -name etcd0
+    -advertise-client-urls http://172.17.0.1:2379,http://172.17.0.1:4001
+    -listen-client-urls http://0.0.0.0:2379,http://0.0.0.0:4001
+    -initial-advertise-peer-urls http://172.17.0.1:2380
+    -listen-peer-urls http://0.0.0.0:2380
+    -initial-cluster-token etcd-cluster-1
+    -initial-cluster etcd0=http://172.17.0.1:2380
 
   # Run CNI docker.
   - cd /tmp/cni/scripts
+  - cp ~/ratchet-cni/conf/* .
   - export NETCONFPATH=/tmp/netconf
-  - CNI_PATH=$CNI_PATH ./docker-run.sh --rm busybox:latest ifconfig
+  - export CNI_PATH=$CNI_PATH 
+  - ./docker-run-primary.sh --name primary -dt busybox /bin/sleep 10000
+  - ./docker-run-pair.sh --name pair -dt busybox /bin/sleep 10000
+  # Show all the interfaces
+  - docker exec -it primary ifconfig 
+  - docker exec -it pair ifconfig
+  # Validate that in1 and in2 are present
+  - docker exec -it primary ifconfig | grep in1
+  - docker exec -it pair ifconfig | grep in2
+  # Ping each IP address
+  - docker exec -it primary ping -c 5 192.168.2.101
+  - docker exec -it pair ping -c 5 192.168.2.100

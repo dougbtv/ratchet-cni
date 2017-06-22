@@ -73,13 +73,11 @@
         NETCONFPATH: /etc/cni/net.d
         CNI_PATH: /opt/cni/bin/
       with_items:
-        - "sleep 5"
         - >
           docker kill $(docker ps | grep -iP "pair|primary" | awk '{print $1}')
         - > 
           docker rm $(docker ps -a | grep -iP "pair|primary" | awk '{print $1}')
         - "./docker-run-primary.sh --name primary -dt busybox /bin/sleep 10000"
-        - "sleep 5"
         - "./docker-run-pair.sh --name pair -dt busybox /bin/sleep 10000"
       ignore_errors: yes
       # need async to let background processes run --> https://ansibledaily.com/execute-detached-process-with-ansible/
