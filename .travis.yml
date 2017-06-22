@@ -28,13 +28,13 @@ script:
   - cd ratchet
   - golint
   - go test -v
-  - go build -o ~/dougbtv/ratchet-cni/bin/ratchet
+  - go build -o ~/gopath/src/github.com/dougbtv/ratchet-cni/bin/ratchet
   - cd ../
   # Build out the child.
   - cd ratchet-child
   - golint
   - go test -v
-  - go build -o ~/dougbtv/ratchet-cni/bin/ratchet-child
+  - go build -o ~/gopath/src/github.com/dougbtv/ratchet-cni/bin/ratchet-child
   # List the binaries
   - cd ../ && ls -lathr ./bin
   # Setup for running with CNI docker.
@@ -62,7 +62,7 @@ script:
   # Build the default plugins (is this necessary? Maybe.)
   - cd /tmp/plugins
   - ./build.sh
-  - cp ~/dougbtv/ratchet-cni/bin/* ./bin/
+  - cp ~/gopath/src/github.com/dougbtv/ratchet-cni/bin/* ./bin/
   - export CNI_PATH=$(pwd)/bin
  
   # Start etcd.
@@ -81,7 +81,7 @@ script:
 
   # Run CNI docker.
   - cd /tmp/cni/scripts
-  - cp ~/dougbtv/ratchet-cni/conf/* .
+  - cp ~/gopath/src/github.com/dougbtv/ratchet-cni/conf/* .
   - export NETCONFPATH=/tmp/netconf
   - export CNI_PATH=$CNI_PATH 
   - ./docker-run-primary.sh --name primary -dt busybox /bin/sleep 10000
