@@ -331,12 +331,12 @@ func logger(input string) {
 }
 
 
-func initEtcd(etcdHost string) {
+func initEtcd(etcdHost string, etcdPort string) {
 
   // Make a connection to etcd. Then we reuse the "kapi"
 
   cfg := client.Config{
-    Endpoints:               []string{"http://" + etcdHost + ":2379"},
+    Endpoints:               []string{"http://" + etcdHost + ":" + etcdPort},
     Transport:               client.DefaultTransport,
     // set timeout per request to fail fast when the target endpoint is unavailable
     HeaderTimeoutPerRequest: time.Second,
@@ -352,7 +352,7 @@ func main() {
   
   // arg := os.Args[3]
 
-  initEtcd(os.Args[3])
+  initEtcd(os.Args[3],os.Args[4])
 
   if (debug) {
     logger("[LOGGING ENABLED]")
@@ -380,16 +380,16 @@ func main() {
   // Apr 29 00:43:30 cni unknown[14534]: ratchet-child: arg[11]: 192.168.2.101
 
   linki := LinkInfo{}
-  linki.PodName = os.Args[4]
-  linki.TargetPod = os.Args[5]
-  linki.TargetContainer = os.Args[6]
-  linki.PublicIP = os.Args[7]
-  linki.LocalIP = os.Args[8]
-  linki.LocalIFName = os.Args[9]
-  linki.PairName = os.Args[10]
-  linki.PairIP = os.Args[11]
-  linki.PairIFName = os.Args[12]
-  linki.Primary = os.Args[13]
+  linki.PodName = os.Args[5]
+  linki.TargetPod = os.Args[6]
+  linki.TargetContainer = os.Args[7]
+  linki.PublicIP = os.Args[8]
+  linki.LocalIP = os.Args[9]
+  linki.LocalIFName = os.Args[10]
+  linki.PairName = os.Args[11]
+  linki.PairIP = os.Args[12]
+  linki.PairIFName = os.Args[13]
+  linki.Primary = os.Args[14]
 
   err := ratchet(os.Args[1],os.Args[2],linki)
   if (err != nil) {

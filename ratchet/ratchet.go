@@ -22,7 +22,6 @@ package main
 import (
   "encoding/json"
   "fmt"
-  "time"
   "log"
   "io/ioutil"
   // "reflect"
@@ -59,6 +58,7 @@ type NetConf struct {
   CNIDir    string                    `json:"cniDir"`
   Delegate map[string]interface{}     `json:"delegate"`
   EtcdHost string                    `json:"etcd_host"`
+  EtcdPort string                    `json:"etcd_port"`
   UseLabels bool                     `json:"use_labels"`
   ChildPath string                   `json:"child_path"`
   BootNetwork map[string]interface{} `json:"boot_network"`
@@ -354,12 +354,12 @@ func ratchet(netconf *NetConf,argif string,containerid string) error {
   linki.Primary = json.Config.Labels["ratchet.primary"]
 
   dumpLinki := spew.Sdump(linki)
-  logger.Printf("DOUG !trace linki ----------%v\n",dumpLinki)
+  logger.Printf("...............DOUG !trace linki ----------%v\n",dumpLinki)
 
   // Spawn external process.
   // ...pass tons of link info along with some basics.
 
-  // logger.Printf("executing path: %v / argif: %v / containerID: %v / etcd_host: %v",netconf.ChildPath,argif,containerid,netconf.EtcdHost);
+  logger.Printf("executing path: %v / argif: %v / containerID: %v / etcd_host: %v",netconf.ChildPath,argif,containerid,netconf.EtcdHost);
   // exec_string := netconf.ChildPath + " " + argif + " " + containerid + " " + netconf.EtcdHost
   // logger.Printf("executing path composite: %v",exec_string);
   cmd := exec.Command(
@@ -367,6 +367,7 @@ func ratchet(netconf *NetConf,argif string,containerid string) error {
     argif,                    // 1
     containerid,
     netconf.EtcdHost,
+    netconf.EtcdPort,
     linki.PodName,
     linki.TargetPod,
     linki.TargetContainer,
@@ -379,6 +380,8 @@ func ratchet(netconf *NetConf,argif string,containerid string) error {
     linki.Primary,
   )
   cmd.Start()
+
+  logger.Println("COMPLETE RATCHET CHILD???? ----------------------->>>>>>>>>>>>>>>")
 
   return printResults(r)
 
@@ -427,23 +430,6 @@ func versionInfo(args *skel.CmdArgs) error {
   fmt.Fprintln(os.Stderr, "Version v0.0.0")
   return result
 
-}
-
-func initEtcd(etcdHost string) {
-
-  // Make a connection to etcd. Then we reuse the "kapi"
-
-  cfg := client.Config{
-    Endpoints:               []string{"http://" + etcdHost + ":2379"},
-    Transport:               client.DefaultTransport,
-    // set timeout per request to fail fast when the target endpoint is unavailable
-    HeaderTimeoutPerRequest: time.Second,
-  }
-  c, err := client.New(cfg)
-  if err != nil {
-    log.Fatal(err)
-  }
-  kapi = client.NewKeysAPI(c)
 }
 
 func main() {

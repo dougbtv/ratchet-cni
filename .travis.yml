@@ -29,14 +29,14 @@ script:
   - go test -v
   - go build -o ~/ratchet-cni/bin/ratchet
   - cd ../
-  # Build out the 
+  # Build out the child.
   - cd ratchet-child
   - golint
   - go test -v
   - go build -o ~/ratchet-cni/bin/ratchet-child
   # List the binaries
   - cd ../ && ls -lathr ./bin
-  # Next steps, run it with the CNI docker stuff
+  # Setup for running with CNI docker.
   - | 
     cat >/tmp/netconf/10-mynet.conf <<EOF
     {
@@ -46,7 +46,7 @@ script:
       "child_path": "/opt/cni/bin/ratchet-child",
       "delegate": {
         "name": "cbr0",
-        "type": "flannel",
+        "type": "loopback",
         "delegate": {
           "isDefaultGateway": true
         }
@@ -60,6 +60,24 @@ script:
   - ./build.sh
   - cp ~/ratchet-cni/bin/* ./bin/
   - export CNI_PATH=$(pwd)/bin
+  # 
+    #   image: "quay.io/coreos/etcd"
+    # ports: 
+    #   - "4001:4001"
+    #   - "2380:2380"
+    #   - "2379:2379"
+    # command: >
+    #   etcd
+    #   -name etcd0
+    #   -advertise-client-urls http://172.17.0.1:2379,http://172.17.0.1:4001
+    #   -listen-client-urls http://0.0.0.0:2379,http://0.0.0.0:4001
+    #   -initial-advertise-peer-urls http://172.17.0.1:2380
+    #   -listen-peer-urls http://0.0.0.0:2380
+    #   -initial-cluster-token etcd-cluster-1
+    #   -initial-cluster etcd0=http://172.17.0.1:2380
+    #   -initial-cluster-state new
+
+  # Run CNI docker.
   - cd /tmp/cni/scripts
   - export NETCONFPATH=/tmp/netconf
   - CNI_PATH=$CNI_PATH ./docker-run.sh --rm busybox:latest ifconfig

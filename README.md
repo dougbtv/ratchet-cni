@@ -38,6 +38,7 @@ Here's a sample configuration that uses Flannel for pods which are not eligible 
   "name": "ratchet-demo",
   "type": "ratchet",
   "etcd_host": "localhost",
+  "etcd_port": "2379",
   "child_path": "/opt/cni/bin/ratchet-child",
   "delegate": {
     "name": "cbr0",
