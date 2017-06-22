@@ -85,10 +85,10 @@ script:
   - export NETCONFPATH=/tmp/netconf
   - export CNI_PATH=$CNI_PATH 
   # Test systemd-cat
-  - systemd-cat --version
-  - echo "testing systemd cat" | systemd-cat
   # Try to run these in the same shebang?
   - sudo ./docker-run-primary.sh --name primary -dt busybox /bin/sleep 10000 && sudo ./docker-run-pair.sh --name pair -dt busybox /bin/sleep 10000
+  - sleep 5
+  - cat /tmp/ratchet-child.txt
   # Show all the interfaces
   - docker exec -it primary ifconfig 
   - docker exec -it pair ifconfig

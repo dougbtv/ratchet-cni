@@ -325,7 +325,12 @@ func logger(input string) {
 
   // exec_command := 
   // os.Stderr.WriteString("!trace alive The containerid: |" + exec_command + "|||\n")
-  cmd := exec.Command("/bin/bash", "-c", "echo \"ratchet-child: " + input + "\" | systemd-cat")
+  
+  // This is a total hack.
+  // cmd := exec.Command("/bin/bash", "-c", "echo \"ratchet-child: " + input + "\" | systemd-cat")
+
+  // This is even MORE of a hack.
+  cmd := exec.Command("/bin/bash", "-c", "echo \"ratchet-child: " + input + "\" >> /tmp/ratchet-child.log")
   cmd.Start()
 
 }
