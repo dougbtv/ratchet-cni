@@ -47,8 +47,8 @@
           dest: /home/centos/cni/cni/scripts/primary.label
         - src: ../conf/pair.label
           dest: /home/centos/cni/cni/scripts/pair.label
-        - src: ../conf/10-mynet.conf
-          dest: /etc/cni/net.d/10-mynet.conf
+        # - src: ../conf/10-mynet.conf
+        #   dest: /etc/cni/net.d/10-mynet.conf
 
     - name: Start etcd container
       shell: >
@@ -69,13 +69,20 @@
 
     - name: Perform docker run
       shell: "{{ item }}"
+      environment:
+        NETCONFPATH: /etc/cni/net.d
+        CNI_PATH: /opt/cni/bin/
       with_items:
-        - "docker stop primary_infra; docker rm primary_infra"
-        - "docker stop pair_infra; docker rm pair_infra"
-        - "docker stop primary; docker rm primary"
-        - "docker stop pair; docker rm pair"
+        - "sleep 5"
+        - >
+          docker kill $(docker ps | grep -iP "pair|primary" | awk '{print $1}')
+        - > 
+          docker rm $(docker ps -a | grep -iP "pair|primary" | awk '{print $1}')
         - "./docker-run-primary.sh --name primary -dt busybox /bin/sleep 10000"
+        - "sleep 5"
         - "./docker-run-pair.sh --name pair -dt busybox /bin/sleep 10000"
       ignore_errors: yes
+      # need async to let background processes run --> https://ansibledaily.com/execute-detached-process-with-ansible/
+      async: 2592000
       args:
         chdir: /home/centos/cni/cni/scripts/
