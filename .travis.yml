@@ -37,6 +37,13 @@ script:
   - go build -o ~/gopath/src/github.com/dougbtv/ratchet-cni/bin/ratchet-child
   # List the binaries
   - cd ../ && ls -lathr ./bin
+
+  # Build the default plugins (is this necessary? Maybe.)
+  - cd /tmp/plugins
+  - ./build.sh
+  - cp ~/gopath/src/github.com/dougbtv/ratchet-cni/bin/* ./bin/
+  - export CNI_PATH=$(pwd)/bin
+
   # Setup for running with CNI docker.
   - | 
     cat >/tmp/netconf/10-mynet.conf <<EOF
@@ -45,7 +52,7 @@ script:
       "type": "ratchet",
       "etcd_host": "localhost",
       "etcd_port": "5656",
-      "child_path": "/opt/cni/bin/ratchet-child",
+      "child_path": "$CNI_PATH/ratchet-child",
       "delegate": {
         "name": "cbr0",
         "type": "flannel",
@@ -58,12 +65,6 @@ script:
       }
     }
     EOF
-
-  # Build the default plugins (is this necessary? Maybe.)
-  - cd /tmp/plugins
-  - ./build.sh
-  - cp ~/gopath/src/github.com/dougbtv/ratchet-cni/bin/* ./bin/
-  - export CNI_PATH=$(pwd)/bin
  
   # Start etcd.
   - >
@@ -87,8 +88,12 @@ script:
   # Test systemd-cat
   # Try to run these in the same shebang?
   - sudo ./docker-run-primary.sh --name primary -dt busybox /bin/sleep 10000 && sudo ./docker-run-pair.sh --name pair -dt busybox /bin/sleep 10000
+  
+  # Look at logs and docker ps
   - sleep 5
-  - cat /tmp/ratchet-child.txt
+  - cat /tmp/ratchet-child.log
+  - docker ps
+  
   # Show all the interfaces
   - docker exec -it primary ifconfig 
   - docker exec -it pair ifconfig
