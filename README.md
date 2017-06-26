@@ -1,6 +1,7 @@
 # Ratchet CNI
 
 ![travis ci status](https://travis-ci.org/dougbtv/ratchet-cni.svg?branch=master)
+
 ![ratchet_logo][ratchet_logo]
 
 A [CNI](https://github.com/containernetworking/cni) plugin (generally for Kubernetes) to create multiple isolated networks using [koko](https://github.com/redhat-nfvpe/koko), the container connector. Currently, it creates a veth pair between containers to facilitate network isolation, and uses a method similar to [Multus CNI](https://github.com/Intel-Corp/multus-cni) to attach multiple interfaces to a pod, where one is a pass-through to another CNI plugin, and the other is ratchet itself, which creates isolated veth interfaces for containers (and later, also vxlan).
