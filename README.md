@@ -1,6 +1,6 @@
 # Ratchet CNI
 
-![travis ci status](https://travis-ci.org/dougbtv/ratchet-cni.svg?branch=master)
+![travis ci status](https://travis-ci.org/dougbtv/ratchet-cni.svg?branch=master)![go report card](https://goreportcard.com/badge/github.com/dougbtv/ratchet-cni)
 
 ![ratchet_logo][ratchet_logo]
 
