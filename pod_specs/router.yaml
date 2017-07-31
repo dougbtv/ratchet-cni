@@ -19,9 +19,14 @@ metadata:
 spec:
   containers:
     - name: centosa
-      image: dougbtv/centos-network
-      command: ["/bin/bash"]
-      args: ["-c", "while true; do sleep 10; done"]
+      image: dougbtv/centos-network-advanced
+      env:
+        - name: "DEFAULT_GW"
+          value: "192.168.2.101"
+        - name: "DEFAULT_DEV"
+          value: "in1"
+        - name: "WAN_IP"
+          value: "1.1.1.1"
       securityContext:
         privileged: true
 ---
@@ -64,6 +69,8 @@ spec:
           path: vtysh.conf
         - key: debian.conf
           path: debian.conf
+        - key: zebra.conf
+          path: zebra.conf
 ---
 apiVersion: v1
 kind: Pod
@@ -104,6 +111,8 @@ spec:
           path: vtysh.conf
         - key: debian.conf
           path: debian.conf
+        - key: zebra.conf
+          path: zebra.conf
 ---
 apiVersion: v1
 kind: Pod
@@ -117,9 +126,14 @@ metadata:
 spec:
   containers:
     - name: centosb
-      image: dougbtv/centos-network
-      command: ["/bin/bash"]
-      args: ["-c", "while true; do sleep 10; done"]
+      image: dougbtv/centos-network-advanced
+      env:
+        - name: "DEFAULT_GW"
+          value: "192.168.4.100"
+        - name: "DEFAULT_DEV"
+          value: "out2"
+        - name: "WAN_IP"
+          value: "4.4.4.4"
       securityContext:
         privileged: true
 ---
@@ -137,15 +151,14 @@ data:
      ospf router-id 2.2.2.2
      redistribute static
      passive-interface in2
-      
      network 192.168.2.0/24 area 0.0.0.0
-      
      network 192.168.3.0/24 area 0.0.0.0
-      
      network 2.2.2.0/24 area 0.0.0.0
-      
      network 3.3.3.0/24 area 0.0.0.0
-  
+
+  zebra.conf: |
+    ip route 1.1.1.1/32 192.168.2.100
+
   daemons: |
     zebra=yes
     bgpd=no
@@ -188,17 +201,14 @@ data:
      ospf router-id 3.3.3.3
      redistribute static
      passive-interface out1
-      
      network 192.168.3.0/24 area 0.0.0.0
-      
      network 192.168.4.0/24 area 0.0.0.0
-      
      network 2.2.2.0/24 area 0.0.0.0
-      
      network 3.3.3.0/24 area 0.0.0.0
-     
-    line vty
 
+  zebra.conf: |
+    ip route 4.4.4.4/32 192.168.4.101
+  
   daemons: |
     zebra=yes
     bgpd=no
