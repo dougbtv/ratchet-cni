@@ -323,12 +323,25 @@ func ratchet(argif string, containerid string, linki LinkInfo) error {
 		Mask: mask2.Mask,
 	}
 
+	// Get the net namespaces
+	ns1, err1 := koko.GetDockerContainerNS(containerid)
+	ns2, err2 := koko.GetDockerContainerNS(pairContainerID)
+
+	// Check those worked.
+	if err1 != nil {
+		return fmt.Errorf("failed to get containerns1 (primary) %v: %v", containerid, err1)
+	}
+
+	if err2 != nil {
+		return fmt.Errorf("failed to get containerns2 (pair) %v: %v", pairContainerID, err2)
+	}
+
 	// And assign those to the veth data structure.
-	veth1.NsName = containerid
+	veth1.NsName = ns1
 	veth1.IPAddr = append(veth1.IPAddr, ipaddr1)
 	veth1.LinkName = linki.LocalIFName
 
-	veth2.NsName = pairContainerID
+	veth2.NsName = ns2
 	veth2.IPAddr = append(veth2.IPAddr, ipaddr2)
 	veth2.LinkName = linki.PairIFName
 
