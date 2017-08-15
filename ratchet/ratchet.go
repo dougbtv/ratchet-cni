@@ -32,6 +32,7 @@ import (
 	"github.com/containernetworking/cni/pkg/invoke"
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
+	"github.com/containernetworking/cni/pkg/version"
 	"golang.org/x/net/context"
 
 	"github.com/davecgh/go-spew/spew"
@@ -200,22 +201,23 @@ func isMasterplugin(netconf map[string]interface{}) bool {
 	return false
 }
 
-func delegateAdd(podif func() string, argif string, netconf map[string]interface{}, onlyMaster bool) (*types.Result, error) {
+// !bang
+func delegateAdd(podif func() string, argif string, netconf map[string]interface{}, onlyMaster bool) (bool, error) {
 	netconfBytes, err := json.Marshal(netconf)
 	if err != nil {
-		return nil, fmt.Errorf("Ratchet: error serializing multus delegate netconf: %v", err)
+		return true, fmt.Errorf("Ratchet: error serializing multus delegate netconf: %v", err)
 	}
 
 	if os.Setenv("CNI_IFNAME", argif) != nil {
-		return nil, fmt.Errorf("Ratchet: error in setting CNI_IFNAME")
+		return true, fmt.Errorf("Ratchet: error in setting CNI_IFNAME")
 	}
 
 	result, err := invoke.DelegateAdd(netconf["type"].(string), netconfBytes)
 	if err != nil {
-		return nil, fmt.Errorf("Ratchet: error in invoke Delegate add - %q: %v", netconf["type"].(string), err)
+		return true, fmt.Errorf("Ratchet: error in invoke Delegate add - %q: %v", netconf["type"].(string), err)
 	}
 
-	return result, nil
+	return false, result.Print()
 
 }
 
@@ -265,12 +267,13 @@ func clearPlugins(mIdx int, pIdx int, argIfname string, delegates []map[string]i
 	return nil
 }
 
-func printResults(delresult *types.Result) error {
-	return delresult.Print()
-}
+// func printResults(delresult *types.Result) error {
+// 	return delresult.Print()
+// }
 
 func ratchet(netconf *NetConf, argif string, containerid string) error {
 
+	var result error
 	// Alright first few things:
 	// 1. Here is where I'd add that we check the k8s api
 	//    in order to see if there's a label that makes this applicable to ratcheting.
@@ -301,7 +304,7 @@ func ratchet(netconf *NetConf, argif string, containerid string) error {
 		panic(errDocker)
 	}
 
-	cli.UpdateClientVersion("1.24")
+	// cli.UpdateClientVersion("1.24")
 
 	json, _ := cli.ContainerInspect(ctx, containerid)
 
@@ -309,17 +312,17 @@ func ratchet(netconf *NetConf, argif string, containerid string) error {
 
 	// ------------------------ Determine container eligibility.
 
-	var err error
-	var r *types.Result
-
 	if _, useRatchet := json.Config.Labels["ratchet"]; useRatchet {
 
 		logger.Println("USE RATCHET ----------------------->>>>>>>>>>>>>>>")
 		// We want to use the ratchet "boot_network"
-		r, err = delegateAdd(podifName, argif, netconf.BootNetwork, false)
-		if err != nil {
-			logger.Printf("ratchet delegateAdd boot_network error ----------%v", err)
-			return err
+		// !bang
+		err, r := delegateAdd(podifName, argif, netconf.BootNetwork, false)
+		if err != true {
+			result = r
+		} else if (err != false) && r != nil {
+			logger.Printf("ratchet delegateAdd boot_network error ----------%v / %v", err, r)
+			return r
 		}
 
 	} else {
@@ -328,13 +331,15 @@ func ratchet(netconf *NetConf, argif string, containerid string) error {
 		// But, now, we just use the delegate.
 		// var mIndex int
 		logger.Println("DO NOT USE RATCHET (passthrough)----------------------->>>>>>>>>>>>>>>")
-		r, err = delegateAdd(podifName, argif, netconf.Delegate, false)
-		if err != nil {
+		err, r := delegateAdd(podifName, argif, netconf.Delegate, false)
+		if err != true {
+			result = r
+		} else if (err != false) && r != nil {
 			logger.Printf("ratchet delegateAdd passthrough error ----------%v", err)
-			return err
+			return r
 		}
 
-		return printResults(r)
+		return r
 
 	}
 
@@ -384,7 +389,7 @@ func ratchet(netconf *NetConf, argif string, containerid string) error {
 
 	logger.Println("COMPLETE RATCHET CHILD???? ----------------------->>>>>>>>>>>>>>>")
 
-	return printResults(r)
+	return result
 
 }
 
@@ -439,5 +444,5 @@ func main() {
 		logger.Println("[LOGGING ENABLED]")
 	}
 
-	skel.PluginMain(cmdAdd, cmdDel)
+	skel.PluginMain(cmdAdd, cmdDel, version.All)
 }

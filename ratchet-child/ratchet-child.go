@@ -23,6 +23,7 @@ import (
 	// "encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"time"
 	// "io/ioutil"
 	// "reflect"
@@ -38,7 +39,7 @@ import (
 	// dockerclient "github.com/docker/docker/client"
 	// "github.com/davecgh/go-spew/spew"
 	"github.com/coreos/etcd/client"
-	"github.com/redhat-nfvpe/koko"
+	koko "github.com/redhat-nfvpe/koko/api"
 )
 
 const aliveWaitSeconds = 1
@@ -76,9 +77,9 @@ func isContainerAlive(containername string) bool {
 		// So let's log when it's not that.
 		// Passing along on this.
 		/*
-		   if (err != client.ErrorCodeKeyNotFound) {
-		     logger.Println(fmt.Errorf("isContainerAlive - possible missing value %s: %v", targetKey, err))
-		   }
+			 if (err != client.ErrorCodeKeyNotFound) {
+				 logger.Println(fmt.Errorf("isContainerAlive - possible missing value %s: %v", targetKey, err))
+			 }
 		*/
 
 	} else {
@@ -101,9 +102,9 @@ func amIAlive(containerid string) bool {
 		// So let's log when it's not that.
 		// Passing along on this.
 		/*
-		   if (err != client.ErrorCodeKeyNotFound) {
-		     logger.Println(fmt.Errorf("isContainerAlive - possible missing value %s: %v", targetKey, err))
-		   }
+			 if (err != client.ErrorCodeKeyNotFound) {
+				 logger.Println(fmt.Errorf("isContainerAlive - possible missing value %s: %v", targetKey, err))
+			 }
 		*/
 
 	} else {
@@ -208,9 +209,9 @@ func isPairContainerAlive(podname string) string {
 		// So let's log when it's not that.
 		// Passing along on this.
 		/*
-		   if (err != client.ErrorCodeKeyNotFound) {
-		     logger.Println(fmt.Errorf("isPairContainerAlive - possible missing value %s: %v", targetKey, err))
-		   }
+			 if (err != client.ErrorCodeKeyNotFound) {
+				 logger.Println(fmt.Errorf("isPairContainerAlive - possible missing value %s: %v", targetKey, err))
+			 }
 		*/
 
 	} else {
@@ -290,22 +291,70 @@ func ratchet(argif string, containerid string, linki LinkInfo) error {
 	// os.Stderr.WriteString("DOUG !trace my_meta ----------\n" + dump_my_meta)
 	// os.Stderr.WriteString("DOUG !trace pair_alive ----------" + fmt.Sprintf("%t",pair_alive) + "\n")
 
-	// !trace !bang
-	// This is how you call up koko.
-	// koko.VethCreator("foo","192.168.2.100/24","in1","bar","192.168.2.101/24","in2")
-
 	// What about a healthy delay?
+	// TODO: This may or may not be necessary.
 	logger(fmt.Sprintf("Pre koko-delay, %v SECONDS", delayKokoSeconds))
 	time.Sleep(delayKokoSeconds * time.Second)
 
-	kokoErr := koko.VethCreator(
-		containerid,
-		linki.LocalIP+"/24",
-		linki.LocalIFName,
-		pairContainerID,
-		linki.PairIP+"/24",
-		linki.PairIFName,
-	)
+	veth1 := koko.VEth{}
+	veth2 := koko.VEth{}
+
+	// Parse addr/cidr into net objects.
+	ip1, mask1, err1 := net.ParseCIDR(linki.LocalIP + "/24")
+	ip2, mask2, err2 := net.ParseCIDR(linki.PairIP + "/24")
+
+	// Check those worked.
+	if err1 != nil {
+		return fmt.Errorf("failed to parse IP addr1 %s: %v", linki.LocalIP+"/24", err1)
+	}
+
+	if err2 != nil {
+		return fmt.Errorf("failed to parse IP addr2 %s: %v", linki.PairIP+"/24", err1)
+	}
+
+	// Make a IPNet object for each of these.
+	ipaddr1 := net.IPNet{
+		IP:   ip1,
+		Mask: mask1.Mask,
+	}
+
+	ipaddr2 := net.IPNet{
+		IP:   ip2,
+		Mask: mask2.Mask,
+	}
+
+	// Get the net namespaces
+	ns1, err1 := koko.GetDockerContainerNS(containerid)
+	ns2, err2 := koko.GetDockerContainerNS(pairContainerID)
+
+	// Check those worked.
+	if err1 != nil {
+		return fmt.Errorf("failed to get containerns1 (primary) %v: %v", containerid, err1)
+	}
+
+	if err2 != nil {
+		return fmt.Errorf("failed to get containerns2 (pair) %v: %v", pairContainerID, err2)
+	}
+
+	// And assign those to the veth data structure.
+	veth1.NsName = ns1
+	veth1.IPAddr = append(veth1.IPAddr, ipaddr1)
+	veth1.LinkName = linki.LocalIFName
+
+	veth2.NsName = ns2
+	veth2.IPAddr = append(veth2.IPAddr, ipaddr2)
+	veth2.LinkName = linki.PairIFName
+
+	kokoErr := koko.MakeVeth(veth1, veth2)
+
+	// kokoErr := koko.VethCreator(
+	// 	containerid,
+	// 	linki.LocalIP+"/24",
+	// 	linki.LocalIFName,
+	// 	pairContainerID,
+	// 	linki.PairIP+"/24",
+	// 	linki.PairIFName,
+	// )
 
 	if kokoErr != nil {
 		logger(fmt.Sprintf("koko error in child: %v", kokoErr))

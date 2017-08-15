@@ -1,6 +1,8 @@
 // Created by cgo -godefs - DO NOT EDIT
 // cgo -godefs types_netbsd.go
 
+// +build amd64,netbsd
+
 package unix
 
 const (
@@ -386,6 +388,11 @@ type Termios struct {
 	Ispeed int32
 	Ospeed int32
 }
+
+const (
+	AT_FDCWD            = -0x64
+	AT_SYMLINK_NOFOLLOW = 0x200
+)
 
 type Sysctlnode struct {
 	Flags           uint32
