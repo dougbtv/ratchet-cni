@@ -64,6 +64,8 @@ type LinkInfo struct {
 	PairIP          string
 	PairIFName      string
 	Primary         string
+	ParentIface     string
+	ParentAddr      string
 }
 
 func isContainerAlive(containername string) bool {
@@ -185,23 +187,61 @@ func getEtcdMetaData(containerid string, setalive bool) map[string]string {
 
 }
 
-func associateIDEtcd(containerid string, podname string) error {
+func associateEtcdInfo(containerid string, linki LinkInfo) error {
 
-	// set "/foo" key with "bar" value
-	// log.Print("Setting '/foo' key with 'bar' value")
-	_, err := kapi.Set(context.Background(), "/ratchet/association/"+podname, containerid, nil)
+	// Associate the containerid to the name.
+	_, err := kapi.Set(context.Background(), "/ratchet/association/"+linki.PodName+"/id", containerid, nil)
 	if err != nil {
-		log.Fatal(err)
+		logger(fmt.Sprintf("SETETCD ASSOC ERROR: %v", err))
 		return err
+	}
+
+	_, err2 := kapi.Set(context.Background(), "/ratchet/association/"+linki.PodName+"/parentiface", linki.ParentIface, nil)
+	if err2 != nil {
+		logger(fmt.Sprintf("SETETCD parentiface ERROR: %v", err2))
+		return err2
+	}
+
+	_, err3 := kapi.Set(context.Background(), "/ratchet/association/"+linki.PodName+"/parentaddr", linki.ParentAddr, nil)
+	if err3 != nil {
+		logger(fmt.Sprintf("SETETCD parentaddr ERROR: %v", err3))
+		return err3
 	}
 
 	return nil
 
 }
 
+func getParentInfo(podname string) (error, string, string) {
+
+	var parentiface = ""
+	var parentaddr = ""
+
+	targetKey := "/ratchet/association/" + podname + "/parentiface"
+	ifResp, err := kapi.Get(context.Background(), targetKey, nil)
+	if err != nil {
+		logger(fmt.Sprintf("ERROR GETTING PARENTIF FROM ETCD: %v / %v @ %v", podname, err, targetKey))
+		return err, parentiface, parentaddr
+	} else {
+		parentiface = ifResp.Node.Value
+	}
+
+	targetKey2 := "/ratchet/association/" + podname + "/parentaddr"
+	addrResp, err2 := kapi.Get(context.Background(), targetKey2, nil)
+	if err2 != nil {
+		logger(fmt.Sprintf("ERROR GETTING PARENTADDR FROM ETCD: %v / %v", podname, err2, targetKey2))
+		return err2, parentiface, parentaddr
+	} else {
+		parentaddr = addrResp.Node.Value
+	}
+
+	return nil, parentiface, parentaddr
+
+}
+
 func isPairContainerAlive(podname string) string {
 
-	targetKey := "/ratchet/association/" + podname
+	targetKey := "/ratchet/association/" + podname + "/id"
 	respContainerID, err := kapi.Get(context.Background(), targetKey, nil)
 	if err != nil {
 
@@ -225,12 +265,12 @@ func isPairContainerAlive(podname string) string {
 
 func ratchet(argif string, containerid string, linki LinkInfo) error {
 
-	os.Stderr.WriteString("!trace alive The containerid: " + containerid + "\n")
+	logger(fmt.Sprintf("ratchet LinkInfo: %v", linki))
 
 	// We no longer care if we're alive anymore.
 	// If this is up, we can assume the infra container is good to go.
 	// So all we need to do is associate our containerid with our name.
-	associateIDEtcd(containerid, linki.PodName)
+	associateEtcdInfo(containerid, linki)
 
 	// If it's determined that we're alive, now we can see if we're primary.
 	// If we're not primary, we can just exit right now.
@@ -270,7 +310,7 @@ func ratchet(argif string, containerid string, linki LinkInfo) error {
 		tries++
 
 		if debug {
-			logger(fmt.Sprintf("Is pair alive? pair_name: %v (%v retries)\n", linki.PairName, tries))
+			logger(fmt.Sprintf("Is pair alive? pair_name: %v (%v retries)", linki.PairName, tries))
 		}
 
 		// We either timeout, or, we're alive.
@@ -285,6 +325,14 @@ func ratchet(argif string, containerid string, linki LinkInfo) error {
 
 	// Now, we can probably rock out all the
 	logger(fmt.Sprintf("And my pair's container id is: %v", pairContainerID))
+
+	// Let's pick up the pair's parent interface info.
+	parentinfoerr, parentiface, parentaddr := getParentInfo(linki.PairName)
+	if parentinfoerr != nil {
+		return parentinfoerr
+	}
+
+	logger(fmt.Sprintf("Got parent info, OK: %v / %v", parentiface, parentaddr))
 
 	// dump_my_meta := spew.Sdump(my_meta)
 	// os.Stderr.WriteString("The containerid: " + containerid + "\n")
@@ -440,6 +488,8 @@ func main() {
 	linki.PairIP = os.Args[12]
 	linki.PairIFName = os.Args[13]
 	linki.Primary = os.Args[14]
+	linki.ParentIface = os.Args[15]
+	linki.ParentAddr = os.Args[16]
 
 	err := ratchet(os.Args[1], os.Args[2], linki)
 	if err != nil {

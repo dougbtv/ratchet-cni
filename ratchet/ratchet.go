@@ -65,6 +65,8 @@ type NetConf struct {
 	UseLabels   bool                   `json:"use_labels"`
 	ChildPath   string                 `json:"child_path"`
 	BootNetwork map[string]interface{} `json:"boot_network"`
+	ParentIface string                 `json:"parent_interface"`
+	ParentAddr  string                 `json:"parent_address"`
 }
 
 // LinkInfo defines the paid of links we're going to create
@@ -384,6 +386,8 @@ func ratchet(netconf *NetConf, argif string, containerid string) error {
 		linki.PairIP,
 		linki.PairIFName,
 		linki.Primary,
+		netconf.ParentIface,
+		netconf.ParentAddr,
 	)
 	cmd.Start()
 

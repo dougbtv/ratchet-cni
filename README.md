@@ -139,7 +139,6 @@ The name idea comes from the idea of a [ratchet puller](https://en.wikipedia.org
 
 ## Customized these Go modules...
 
-* `nfvpe/koko`
-
+(none at the moment, thanks.)
 
 [ratchet_logo]: docs/ratchet.png
