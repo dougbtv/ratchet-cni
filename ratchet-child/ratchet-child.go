@@ -29,6 +29,7 @@ import (
 	// "reflect"
 	"os"
 	"os/exec"
+	"strconv"
 	// "path/filepath"
 
 	// "github.com/containernetworking/cni/pkg/invoke"
@@ -47,6 +48,7 @@ const aliveWaitRetries = 60
 const delayKokoSeconds = 1
 const defaultCNIDir = "/var/lib/cni/multus"
 const debug = true
+const beginningVxlanId = 11
 
 var kapi client.KeysAPI
 
@@ -239,6 +241,46 @@ func getParentInfo(podname string) (error, string, string) {
 
 }
 
+func getVxLanId() (error, int) {
+
+	targetKey := "/ratchet/vxlanid"
+	vxlanidResp, err := kapi.Get(context.Background(), targetKey, nil)
+	if err != nil {
+		// if (err != client.ErrorCodeKeyNotFound) {
+		// 	// That's a real error?
+		// 	logger("UNEXCEPTED getVxLan-Id ERROR CODE? %v",err)
+		// }
+		
+		// Let's assume that means we don't have this set.
+		// so let's default it.
+		_, err2 := kapi.Set(context.Background(), targetKey, strconv.Itoa(beginningVxlanId + 1), nil)
+		if err2 != nil {
+			logger(fmt.Sprintf("SETETCD getVxLan-Id ERROR: %v", err2))
+			return err2, 0
+		}
+
+		return nil, beginningVxlanId
+
+	} else {
+		// Ok pick up the current one.
+		vxlanstring := vxlanidResp.Node.Value
+
+		// Convert it to an int
+		vxlanid, _ := strconv.Atoi(vxlanstring)
+
+		// Increment it, and set it.
+		_, err2 := kapi.Set(context.Background(), targetKey, strconv.Itoa(vxlanid + 1), nil)
+		if err2 != nil {
+			logger(fmt.Sprintf("SETETCD increment getVxLan-Id ERROR: %v", err2))
+			return err2, 0
+		}
+
+		// Return the current one.
+		return nil, vxlanid
+	}
+
+}
+
 func isPairContainerAlive(podname string) string {
 
 	targetKey := "/ratchet/association/" + podname + "/id"
@@ -326,26 +368,30 @@ func ratchet(argif string, containerid string, linki LinkInfo) error {
 	// Now, we can probably rock out all the
 	logger(fmt.Sprintf("And my pair's container id is: %v", pairContainerID))
 
-	// Let's pick up the pair's parent interface info.
-	parentinfoerr, parentiface, parentaddr := getParentInfo(linki.PairName)
-	if parentinfoerr != nil {
-		return parentinfoerr
-	}
-
-	logger(fmt.Sprintf("Got parent info, OK: %v / %v", parentiface, parentaddr))
-
-	// dump_my_meta := spew.Sdump(my_meta)
-	// os.Stderr.WriteString("The containerid: " + containerid + "\n")
-	// os.Stderr.WriteString("DOUG !trace my_meta ----------\n" + dump_my_meta)
-	// os.Stderr.WriteString("DOUG !trace pair_alive ----------" + fmt.Sprintf("%t",pair_alive) + "\n")
-
 	// What about a healthy delay?
 	// TODO: This may or may not be necessary.
 	logger(fmt.Sprintf("Pre koko-delay, %v SECONDS", delayKokoSeconds))
 	time.Sleep(delayKokoSeconds * time.Second)
 
-	veth1 := koko.VEth{}
-	veth2 := koko.VEth{}
+	// Let's pick up the pair's parent interface info.
+	parentinfoerr, pairparentiface, pairparentaddr := getParentInfo(linki.PairName)
+	if parentinfoerr != nil {
+		return parentinfoerr
+	}
+
+	logger(fmt.Sprintf("Got parent info, OK: %v / %v", pairparentiface, pairparentaddr))
+
+	// Ok, so now that we have the parent interface information for the pair...
+	// We can now decide if we want to use vxlan. 
+	// For now we use the configured IP address in the config to determine if they're different.
+	// TODO: This needs to be more dynamic, and use a better standard way of doing it.
+	var usevxlan = true
+	logger("WARNING: HARDCODED usevxlan VALUE, PLEASE 2 B REMOVING, KTHXBAI.")
+
+	if (linki.ParentAddr != pairparentaddr) {
+		// That'd be the time to use vxlan
+		usevxlan = true
+	}
 
 	// Parse addr/cidr into net objects.
 	ip1, mask1, err1 := net.ParseCIDR(linki.LocalIP + "/24")
@@ -373,40 +419,106 @@ func ratchet(argif string, containerid string, linki LinkInfo) error {
 
 	// Get the net namespaces
 	ns1, err1 := koko.GetDockerContainerNS(containerid)
-	ns2, err2 := koko.GetDockerContainerNS(pairContainerID)
-
-	// Check those worked.
 	if err1 != nil {
 		return fmt.Errorf("failed to get containerns1 (primary) %v: %v", containerid, err1)
 	}
 
-	if err2 != nil {
-		return fmt.Errorf("failed to get containerns2 (pair) %v: %v", pairContainerID, err2)
-	}
-
-	// And assign those to the veth data structure.
+	// And assign those to the initial veth data structure.
+	veth1 := koko.VEth{}
 	veth1.NsName = ns1
 	veth1.IPAddr = append(veth1.IPAddr, ipaddr1)
 	veth1.LinkName = linki.LocalIFName
 
-	veth2.NsName = ns2
-	veth2.IPAddr = append(veth2.IPAddr, ipaddr2)
-	veth2.LinkName = linki.PairIFName
+	if (usevxlan) {
 
-	kokoErr := koko.MakeVeth(veth1, veth2)
+		// Ok, so we gotta create our own vxlan.
+		// Then we have to somehow remotely trigger the other side to make a vxlan.
 
-	// kokoErr := koko.VethCreator(
-	// 	containerid,
-	// 	linki.LocalIP+"/24",
-	// 	linki.LocalIFName,
-	// 	pairContainerID,
-	// 	linki.PairIP+"/24",
-	// 	linki.PairIFName,
-	// )
 
-	if kokoErr != nil {
-		logger(fmt.Sprintf("koko error in child: %v", kokoErr))
-		return kokoErr
+		// let's figure out our own, here first.
+
+		/*
+		// parseXOption parses '-x' option and put this information in veth object.
+		func parseXOption(s string) (vxlan vxLan, err error) {
+			var err2 error // if we encounter an error, it's marked here.
+
+			n := strings.Split(s, ":")
+			if len(n) != 3 {
+				err = fmt.Errorf("failed to parse %s", s)
+				return
+			}
+
+			vxlan.parentIF = n[0]
+			vxlan.ipAddr = net.ParseIP(n[1])
+			vxlan.id, err2 = strconv.Atoi(n[2])
+			if err2 != nil {
+				err = fmt.Errorf("failed to parse VXID %s: %v", n[2], err2)
+				return
+			}
+
+			return
+		}
+		*/
+
+		// Pick up the vxlan id from etcd.
+		_, vxlanid := getVxLanId()
+
+		// Set the vxlan properties.
+		vxlan := koko.VxLan{}
+		vxlan.ParentIF = linki.ParentIface
+		vxlan.IPAddr = net.ParseIP(pairparentaddr)
+		vxlan.ID = vxlanid
+
+		// Log it all.
+		logger(fmt.Sprintf("VXLAN INFO: %v",vxlan))
+
+		// Now ask koko to do it?
+		errvxlan := koko.MakeVxLan(veth1, vxlan)
+
+		if (errvxlan != nil) {
+			logger(fmt.Sprintf("VXLAN ERROR: %v",errvxlan))
+			return errvxlan
+		}
+
+		// Here's where you trigger the remote???
+		// ...we might go into a wait loop on the pair.
+		
+
+	} else {
+
+		// Make a vEth
+		// dump_my_meta := spew.Sdump(my_meta)
+		// os.Stderr.WriteString("The containerid: " + containerid + "\n")
+		// os.Stderr.WriteString("DOUG !trace my_meta ----------\n" + dump_my_meta)
+		// os.Stderr.WriteString("DOUG !trace pair_alive ----------" + fmt.Sprintf("%t",pair_alive) + "\n")
+		ns2, err2 := koko.GetDockerContainerNS(pairContainerID)
+		if err2 != nil {
+			return fmt.Errorf("failed to get containerns2 (pair) %v: %v", pairContainerID, err2)
+		}
+
+		// make the other side of the veth.
+		veth2 := koko.VEth{}
+
+		veth2.NsName = ns2
+		veth2.IPAddr = append(veth2.IPAddr, ipaddr2)
+		veth2.LinkName = linki.PairIFName
+
+		kokoErr := koko.MakeVeth(veth1, veth2)
+
+		// kokoErr := koko.VethCreator(
+		// 	containerid,
+		// 	linki.LocalIP+"/24",
+		// 	linki.LocalIFName,
+		// 	pairContainerID,
+		// 	linki.PairIP+"/24",
+		// 	linki.PairIFName,
+		// )
+
+		if kokoErr != nil {
+			logger(fmt.Sprintf("koko error in child: %v", kokoErr))
+			return kokoErr
+		}
+
 	}
 
 	logger("Koko appears to have completed with success.")
