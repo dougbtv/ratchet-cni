@@ -11,6 +11,9 @@ sudo: required
 services:
   - docker
 
+install:
+  - echo "not applicable"
+
 before_install:
   # Get the linter.
   - go get github.com/golang/lint/golint
