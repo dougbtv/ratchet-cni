@@ -23,8 +23,8 @@ import (
 	// "encoding/json"
 	"fmt"
 	"log"
-	"time"
 	"net"
+	"time"
 	// "io/ioutil"
 	// "reflect"
 	"os"
@@ -303,24 +303,23 @@ func ratchet(argif string, containerid string, linki LinkInfo) error {
 	ip1, mask1, err1 := net.ParseCIDR(linki.LocalIP + "/24")
 	ip2, mask2, err2 := net.ParseCIDR(linki.PairIP + "/24")
 
-
 	// Check those worked.
 	if err1 != nil {
-		return fmt.Errorf("failed to parse IP addr1 %s: %v", linki.LocalIP + "/24", err1)
+		return fmt.Errorf("failed to parse IP addr1 %s: %v", linki.LocalIP+"/24", err1)
 	}
 
 	if err2 != nil {
-		return fmt.Errorf("failed to parse IP addr2 %s: %v", linki.PairIP + "/24", err1)
+		return fmt.Errorf("failed to parse IP addr2 %s: %v", linki.PairIP+"/24", err1)
 	}
 
 	// Make a IPNet object for each of these.
 	ipaddr1 := net.IPNet{
-		IP: ip1,
+		IP:   ip1,
 		Mask: mask1.Mask,
 	}
 
 	ipaddr2 := net.IPNet{
-		IP: ip2,
+		IP:   ip2,
 		Mask: mask2.Mask,
 	}
 
