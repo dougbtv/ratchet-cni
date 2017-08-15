@@ -328,9 +328,9 @@ func ratchet(argif string, containerid string, linki LinkInfo) error {
 	veth1.IPAddr = append(veth1.IPAddr, ipaddr1)
 	veth1.LinkName = linki.LocalIFName
 
-	veth1.NsName = pairContainerID
-	veth1.IPAddr = append(veth2.IPAddr, ipaddr2)
-	veth1.LinkName = linki.PairIFName
+	veth2.NsName = pairContainerID
+	veth2.IPAddr = append(veth2.IPAddr, ipaddr2)
+	veth2.LinkName = linki.PairIFName
 
 	kokoErr := koko.MakeVeth(veth1, veth2)
 
