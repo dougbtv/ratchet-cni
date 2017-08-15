@@ -250,10 +250,10 @@ func getVxLanId() (error, int) {
 		// 	// That's a real error?
 		// 	logger("UNEXCEPTED getVxLan-Id ERROR CODE? %v",err)
 		// }
-		
+
 		// Let's assume that means we don't have this set.
 		// so let's default it.
-		_, err2 := kapi.Set(context.Background(), targetKey, strconv.Itoa(beginningVxlanId + 1), nil)
+		_, err2 := kapi.Set(context.Background(), targetKey, strconv.Itoa(beginningVxlanId+1), nil)
 		if err2 != nil {
 			logger(fmt.Sprintf("SETETCD getVxLan-Id ERROR: %v", err2))
 			return err2, 0
@@ -269,7 +269,7 @@ func getVxLanId() (error, int) {
 		vxlanid, _ := strconv.Atoi(vxlanstring)
 
 		// Increment it, and set it.
-		_, err2 := kapi.Set(context.Background(), targetKey, strconv.Itoa(vxlanid + 1), nil)
+		_, err2 := kapi.Set(context.Background(), targetKey, strconv.Itoa(vxlanid+1), nil)
 		if err2 != nil {
 			logger(fmt.Sprintf("SETETCD increment getVxLan-Id ERROR: %v", err2))
 			return err2, 0
@@ -382,13 +382,13 @@ func ratchet(argif string, containerid string, linki LinkInfo) error {
 	logger(fmt.Sprintf("Got parent info, OK: %v / %v", pairparentiface, pairparentaddr))
 
 	// Ok, so now that we have the parent interface information for the pair...
-	// We can now decide if we want to use vxlan. 
+	// We can now decide if we want to use vxlan.
 	// For now we use the configured IP address in the config to determine if they're different.
 	// TODO: This needs to be more dynamic, and use a better standard way of doing it.
 	var usevxlan = true
 	logger("WARNING: HARDCODED usevxlan VALUE, PLEASE 2 B REMOVING, KTHXBAI.")
 
-	if (linki.ParentAddr != pairparentaddr) {
+	if linki.ParentAddr != pairparentaddr {
 		// That'd be the time to use vxlan
 		usevxlan = true
 	}
@@ -429,36 +429,12 @@ func ratchet(argif string, containerid string, linki LinkInfo) error {
 	veth1.IPAddr = append(veth1.IPAddr, ipaddr1)
 	veth1.LinkName = linki.LocalIFName
 
-	if (usevxlan) {
+	if usevxlan {
 
 		// Ok, so we gotta create our own vxlan.
 		// Then we have to somehow remotely trigger the other side to make a vxlan.
 
-
 		// let's figure out our own, here first.
-
-		/*
-		// parseXOption parses '-x' option and put this information in veth object.
-		func parseXOption(s string) (vxlan vxLan, err error) {
-			var err2 error // if we encounter an error, it's marked here.
-
-			n := strings.Split(s, ":")
-			if len(n) != 3 {
-				err = fmt.Errorf("failed to parse %s", s)
-				return
-			}
-
-			vxlan.parentIF = n[0]
-			vxlan.ipAddr = net.ParseIP(n[1])
-			vxlan.id, err2 = strconv.Atoi(n[2])
-			if err2 != nil {
-				err = fmt.Errorf("failed to parse VXID %s: %v", n[2], err2)
-				return
-			}
-
-			return
-		}
-		*/
 
 		// Pick up the vxlan id from etcd.
 		_, vxlanid := getVxLanId()
@@ -470,19 +446,18 @@ func ratchet(argif string, containerid string, linki LinkInfo) error {
 		vxlan.ID = vxlanid
 
 		// Log it all.
-		logger(fmt.Sprintf("VXLAN INFO: %v",vxlan))
+		logger(fmt.Sprintf("VXLAN INFO: %v", vxlan))
 
 		// Now ask koko to do it?
 		errvxlan := koko.MakeVxLan(veth1, vxlan)
 
-		if (errvxlan != nil) {
-			logger(fmt.Sprintf("VXLAN ERROR: %v",errvxlan))
+		if errvxlan != nil {
+			logger(fmt.Sprintf("VXLAN ERROR: %v", errvxlan))
 			return errvxlan
 		}
 
 		// Here's where you trigger the remote???
 		// ...we might go into a wait loop on the pair.
-		
 
 	} else {
 
