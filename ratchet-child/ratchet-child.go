@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"log"
 	"time"
+	"net"
 	// "io/ioutil"
 	// "reflect"
 	"os"
@@ -290,26 +291,49 @@ func ratchet(argif string, containerid string, linki LinkInfo) error {
 	// os.Stderr.WriteString("DOUG !trace my_meta ----------\n" + dump_my_meta)
 	// os.Stderr.WriteString("DOUG !trace pair_alive ----------" + fmt.Sprintf("%t",pair_alive) + "\n")
 
-	// !trace !bang
-	// This is how you call up koko.
-	// koko.VethCreator("foo","192.168.2.100/24","in1","bar","192.168.2.101/24","in2")
-
 	// What about a healthy delay?
+	// TODO: This may or may not be necessary.
 	logger(fmt.Sprintf("Pre koko-delay, %v SECONDS", delayKokoSeconds))
 	time.Sleep(delayKokoSeconds * time.Second)
 
 	veth1 := koko.VEth{}
 	veth2 := koko.VEth{}
 
+	// Parse addr/cidr into net objects.
+	ip1, mask1, err1 := net.ParseCIDR(linki.LocalIP + "/24")
+	ip2, mask2, err2 := net.ParseCIDR(linki.PairIP + "/24")
+
+
+	// Check those worked.
+	if err1 != nil {
+		return fmt.Errorf("failed to parse IP addr1 %s: %v", linki.LocalIP + "/24", err1)
+	}
+
+	if err2 != nil {
+		return fmt.Errorf("failed to parse IP addr2 %s: %v", linki.PairIP + "/24", err1)
+	}
+
+	// Make a IPNet object for each of these.
+	ipaddr1 := net.IPNet{
+		IP: ip1,
+		Mask: mask1.Mask,
+	}
+
+	ipaddr2 := net.IPNet{
+		IP: ip2,
+		Mask: mask2.Mask,
+	}
+
+	// And assign those to the veth data structure.
 	veth1.NsName = containerid
-	veth1.IPAddr = linki.LocalIP + "/24"
+	veth1.IPAddr = append(veth1.IPAddr, ipaddr1)
 	veth1.LinkName = linki.LocalIFName
 
 	veth1.NsName = pairContainerID
-	veth1.IPAddr = linki.PairIP + "/24"
+	veth1.IPAddr = append(veth2.IPAddr, ipaddr2)
 	veth1.LinkName = linki.PairIFName
 
-	koko.makeVeth(veth1, veth2)
+	kokoErr := koko.MakeVeth(veth1, veth2)
 
 	// kokoErr := koko.VethCreator(
 	// 	containerid,
