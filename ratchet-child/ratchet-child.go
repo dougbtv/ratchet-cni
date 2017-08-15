@@ -38,7 +38,7 @@ import (
 	// dockerclient "github.com/docker/docker/client"
 	// "github.com/davecgh/go-spew/spew"
 	"github.com/coreos/etcd/client"
-	"github.com/redhat-nfvpe/koko"
+	koko "github.com/redhat-nfvpe/koko/api"
 )
 
 const aliveWaitSeconds = 1
@@ -76,9 +76,9 @@ func isContainerAlive(containername string) bool {
 		// So let's log when it's not that.
 		// Passing along on this.
 		/*
-		   if (err != client.ErrorCodeKeyNotFound) {
-		     logger.Println(fmt.Errorf("isContainerAlive - possible missing value %s: %v", targetKey, err))
-		   }
+			 if (err != client.ErrorCodeKeyNotFound) {
+				 logger.Println(fmt.Errorf("isContainerAlive - possible missing value %s: %v", targetKey, err))
+			 }
 		*/
 
 	} else {
@@ -101,9 +101,9 @@ func amIAlive(containerid string) bool {
 		// So let's log when it's not that.
 		// Passing along on this.
 		/*
-		   if (err != client.ErrorCodeKeyNotFound) {
-		     logger.Println(fmt.Errorf("isContainerAlive - possible missing value %s: %v", targetKey, err))
-		   }
+			 if (err != client.ErrorCodeKeyNotFound) {
+				 logger.Println(fmt.Errorf("isContainerAlive - possible missing value %s: %v", targetKey, err))
+			 }
 		*/
 
 	} else {
@@ -208,9 +208,9 @@ func isPairContainerAlive(podname string) string {
 		// So let's log when it's not that.
 		// Passing along on this.
 		/*
-		   if (err != client.ErrorCodeKeyNotFound) {
-		     logger.Println(fmt.Errorf("isPairContainerAlive - possible missing value %s: %v", targetKey, err))
-		   }
+			 if (err != client.ErrorCodeKeyNotFound) {
+				 logger.Println(fmt.Errorf("isPairContainerAlive - possible missing value %s: %v", targetKey, err))
+			 }
 		*/
 
 	} else {
@@ -298,14 +298,27 @@ func ratchet(argif string, containerid string, linki LinkInfo) error {
 	logger(fmt.Sprintf("Pre koko-delay, %v SECONDS", delayKokoSeconds))
 	time.Sleep(delayKokoSeconds * time.Second)
 
-	kokoErr := koko.VethCreator(
-		containerid,
-		linki.LocalIP+"/24",
-		linki.LocalIFName,
-		pairContainerID,
-		linki.PairIP+"/24",
-		linki.PairIFName,
-	)
+	veth1 := koko.VEth{}
+	veth2 := koko.VEth{}
+
+	veth1.NsName = containerid
+	veth1.IPAddr = linki.LocalIP + "/24"
+	veth1.LinkName = linki.LocalIFName
+
+	veth1.NsName = pairContainerID
+	veth1.IPAddr = linki.PairIP + "/24"
+	veth1.LinkName = linki.PairIFName
+
+	koko.makeVeth(veth1, veth2)
+
+	// kokoErr := koko.VethCreator(
+	// 	containerid,
+	// 	linki.LocalIP+"/24",
+	// 	linki.LocalIFName,
+	// 	pairContainerID,
+	// 	linki.PairIP+"/24",
+	// 	linki.PairIFName,
+	// )
 
 	if kokoErr != nil {
 		logger(fmt.Sprintf("koko error in child: %v", kokoErr))
