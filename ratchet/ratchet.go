@@ -201,6 +201,7 @@ func isMasterplugin(netconf map[string]interface{}) bool {
 	return false
 }
 
+// !bang
 func delegateAdd(podif func() string, argif string, netconf map[string]interface{}, onlyMaster bool) (bool, error) {
 	netconfBytes, err := json.Marshal(netconf)
 	if err != nil {
@@ -315,10 +316,13 @@ func ratchet(netconf *NetConf, argif string, containerid string) error {
 
 		logger.Println("USE RATCHET ----------------------->>>>>>>>>>>>>>>")
 		// We want to use the ratchet "boot_network"
-		err, _ := delegateAdd(podifName, argif, netconf.BootNetwork, false)
+		// !bang
+		err, r := delegateAdd(podifName, argif, netconf.BootNetwork, false)
 		if err != true {
-			logger.Printf("ratchet delegateAdd boot_network error ----------%v", err)
-			return fmt.Errorf("ratchet delegateAdd boot_network error")
+			result = r
+		} else if (err != false) && r != nil {
+			logger.Printf("ratchet delegateAdd boot_network error ----------%v / %v", err, r)
+			return r
 		}
 
 	} else {
@@ -329,8 +333,10 @@ func ratchet(netconf *NetConf, argif string, containerid string) error {
 		logger.Println("DO NOT USE RATCHET (passthrough)----------------------->>>>>>>>>>>>>>>")
 		err, r := delegateAdd(podifName, argif, netconf.Delegate, false)
 		if err != true {
+			result = r
+		} else if (err != false) && r != nil {
 			logger.Printf("ratchet delegateAdd passthrough error ----------%v", err)
-			return fmt.Errorf("ratchet delegateAdd passthrough error")
+			return r
 		}
 
 		return r
