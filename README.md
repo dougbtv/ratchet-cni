@@ -4,7 +4,7 @@
 
 ![ratchet_logo][ratchet_logo]
 
-A [CNI](https://github.com/containernetworking/cni) plugin (generally for Kubernetes) to create multiple isolated networks using [koko](https://github.com/redhat-nfvpe/koko), the container connector. Currently, it creates a veth pair between containers to facilitate network isolation, and uses a method similar to [Multus CNI](https://github.com/Intel-Corp/multus-cni) to attach multiple interfaces to a pod, where one is a pass-through to another CNI plugin, and the other is ratchet itself, which creates isolated veth interfaces for containers (and later, also vxlan).
+A [CNI](https://github.com/containernetworking/cni) plugin (generally for Kubernetes) to create multiple isolated networks using [koko](https://github.com/redhat-nfvpe/koko), the container connector. Currently, it creates a veth pair between containers to facilitate network isolation, and uses a method similar to [Multus CNI](https://github.com/Intel-Corp/multus-cni) to attach multiple interfaces to a pod, where one is a pass-through to another CNI plugin, and the other is ratchet itself, which creates isolated veth interfaces for containers -- or vxlan when pods are across hosts (more documentation to come on vxlan).
 
 The configuration allows you to pass-through another CNI plugin to some containers (say, Flannel), yet lets you specifically configure other pods to be eligible for treatment under the network isolation scheme as per Ratchet. For now, ones specifies labels for eligible pods to be treated under Ratchet.
 
@@ -12,11 +12,11 @@ More to come, it's a prototype.
 
 ## Requirements
 
-Requires that you have [etcd](https://github.com/coreos/etcd) running, and the compute nodes in your Kubernetes cluster have network access to that etcd.
+Requires that you have [etcd](https://github.com/coreos/etcd) running, and the minion nodes (where the CNI plugin will run) in your Kubernetes cluster have network access to that etcd.
 
-## Current limitations
+## Future improvements
 
-Currently, Ratchet only uses the vEth features of Koko, and not the VXLAN functionality -- so it will only work for pods that are launched on the same minion node.
+Some of the annotation for labels on the pods are somewhat limited. Also, some of the configuration for vxlan 
 
 ## Building Ratchet.
 
@@ -42,6 +42,8 @@ Here's a sample configuration that uses Flannel for pods which are not eligible 
   "etcd_host": "localhost",
   "etcd_port": "2379",
   "child_path": "/opt/cni/bin/ratchet-child",
+  "parent_interface": "eth0",
+  "parent_address": "192.168.1.224",
   "delegate": {
     "name": "cbr0",
     "type": "flannel",
@@ -54,6 +56,8 @@ Here's a sample configuration that uses Flannel for pods which are not eligible 
   }
 }
 ```
+
+
 
 Sample configurations are also available in the `./conf/` directory.
 
@@ -70,10 +74,14 @@ All of these properties are required:
 * `child_path`: path of the "child" binary.
 * `delegate`: an entire CNI config nested in this property. Above sample is Flannel, this config applies to ineligible pods only.
 * `boot_network`: an entire CNI config nested in this property. This is attached to each eligible pod.
+* `parent_interface`: Change `parent_interface` to the interface over which the vxlan interfaces will be created
+* `parent_address`: The address which remote hosts will point vxlan interfaces towards.
 
 **Delegate vs Boot Network**
 
-The `delegate proper`
+The `delegate` proper is an embedded configuration for a plugin to delegate to. If a pod is not marked as being eligible for ratchet, the pods will use this plugin.
+
+The `boot_network` is created before other network interfaces for the pod. Which could be used to otherwise initialize it. It is another embedded CNI config.
 
 **How to differentiate between eligible and ineligible**
 
@@ -139,7 +147,6 @@ The name idea comes from the idea of a [ratchet puller](https://en.wikipedia.org
 
 ## Customized these Go modules...
 
-* `nfvpe/koko`
-
+(none at the moment, thanks.)
 
 [ratchet_logo]: docs/ratchet.png
