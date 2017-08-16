@@ -433,8 +433,7 @@ func ratchet(argif string, containerid string, linki LinkInfo) error {
 		}
 
 		// Determine if we're going to use vxlan.
-		logger("WARNING: HARDCODED usevxlan VALUE, PLEASE 2 B REMOVING, KTHXBAI. (PAIR SIDE)")
-		pairusevxlan := true
+		pairusevxlan := false
 
 		if linki.ParentAddr != primaryparentaddr {
 			pairusevxlan = true
@@ -547,8 +546,7 @@ func ratchet(argif string, containerid string, linki LinkInfo) error {
 	// We can now decide if we want to use vxlan.
 	// For now we use the configured IP address in the config to determine if they're different.
 	// TODO: This needs to be more dynamic, and use a better standard way of doing it.
-	var usevxlan = true
-	logger("WARNING: HARDCODED usevxlan VALUE, PLEASE 2 B REMOVING, KTHXBAI.")
+	var usevxlan = false
 
 	if linki.ParentAddr != pairparentaddr {
 		// That'd be the time to use vxlan
