@@ -308,7 +308,7 @@ func ratchet(netconf *NetConf, argif string, containerid string) error {
 
 	// cli.UpdateClientVersion("1.24")
 	cli.NegotiateAPIVersion(ctx)
-	
+
 	json, dockerclienterr := cli.ContainerInspect(ctx, containerid)
 	if dockerclienterr != nil {
 		return fmt.Errorf("Dockerclient err: %v", dockerclienterr)
