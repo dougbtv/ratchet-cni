@@ -270,7 +270,7 @@ func getVxLanParentInfo(podname string) (string, string, error) {
 	targetKey2 := "/ratchet/association/" + podname + "/parentaddr"
 	addrResp, err2 := kapi.Get(context.Background(), targetKey2, nil)
 	if err2 != nil {
-		logger(fmt.Sprintf("ERROR GETTING PARENTADDR FROM ETCD: %v / %v", podname, err2, targetKey2))
+		logger(fmt.Sprintf("ERROR GETTING PARENTADDR FROM ETCD: %v / %v / %v", podname, err2, targetKey2))
 		return parentiface, parentaddr, err2
 	}
 
