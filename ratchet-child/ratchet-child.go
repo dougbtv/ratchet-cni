@@ -48,7 +48,7 @@ const aliveWaitRetries = 60
 const delayKokoSeconds = 1
 const defaultCNIDir = "/var/lib/cni/multus"
 const debug = true
-const beginningVxlanId = 11
+const beginningVxlanID = 11
 
 var kapi client.KeysAPI
 
@@ -189,7 +189,7 @@ func getEtcdMetaData(containerid string, setalive bool) map[string]string {
 
 }
 
-func associateEtcdInfo(containerid string, linki LinkInfo) (error, int) {
+func associateEtcdInfo(containerid string, linki LinkInfo) (int,error) {
 
 	var vxlanid = 0
 
@@ -197,62 +197,62 @@ func associateEtcdInfo(containerid string, linki LinkInfo) (error, int) {
 	_, err := kapi.Set(context.Background(), "/ratchet/association/"+linki.PodName+"/id", containerid, nil)
 	if err != nil {
 		logger(fmt.Sprintf("SETETCD ASSOC ERROR: %v", err))
-		return err, 0
+		return 0,err
 	}
 
 	_, err2 := kapi.Set(context.Background(), "/ratchet/association/"+linki.PodName+"/parentiface", linki.ParentIface, nil)
 	if err2 != nil {
 		logger(fmt.Sprintf("SETETCD parentiface ERROR: %v", err2))
-		return err2, 0
+		return 0,err2
 	}
 
 	_, err3 := kapi.Set(context.Background(), "/ratchet/association/"+linki.PodName+"/parentaddr", linki.ParentAddr, nil)
 	if err3 != nil {
 		logger(fmt.Sprintf("SETETCD parentaddr ERROR: %v", err3))
-		return err3, 0
+		return 0,err3
 	}
 
 	// Things the primary also stores....
 	if linki.Primary == "true" {
 
 		// we should handle the vxlan id now.
-		_, vxlanid = getVxLanId()
+		vxlanid, _ = getVxLanID()
 
 		// and we have to store it.
 		_, err5 := kapi.Set(context.Background(), "/ratchet/association/"+linki.PairName+"/vxlanid", strconv.Itoa(vxlanid), nil)
 		if err5 != nil {
 			logger(fmt.Sprintf("SETETCD vxlanid assoc ERROR: %v", err5))
-			return err5, 0
+			return 0,err5
 		}
 
 		// and we have to save the pair IP.
 		_, err6 := kapi.Set(context.Background(), "/ratchet/association/"+linki.PairName+"/pairip", linki.PairIP, nil)
 		if err6 != nil {
 			logger(fmt.Sprintf("SETETCD primaryname ERROR: %v", err6))
-			return err6, 0
+			return 0,err6
 		}
 
 		// and we have to save the pair interface.
 		_, err7 := kapi.Set(context.Background(), "/ratchet/association/"+linki.PairName+"/pairifname", linki.PairIFName, nil)
 		if err7 != nil {
 			logger(fmt.Sprintf("SETETCD primaryname ERROR: %v", err7))
-			return err7, 0
+			return 0,err7
 		}
 
 		// we're primary, we need to let the pair know how to find the primary.
 		_, err4 := kapi.Set(context.Background(), "/ratchet/association/"+linki.PairName+"/primaryname", linki.PodName, nil)
 		if err4 != nil {
 			logger(fmt.Sprintf("SETETCD primaryname ERROR: %v", err4))
-			return err4, 0
+			return 0,err4
 		}
 
 	}
 
-	return nil, vxlanid
+	return vxlanid, nil
 
 }
 
-func getVxLanParentInfo(podname string) (error, string, string) {
+func getVxLanParentInfo(podname string) (string, string,error) {
 
 	var parentiface = ""
 	var parentaddr = ""
@@ -261,25 +261,26 @@ func getVxLanParentInfo(podname string) (error, string, string) {
 	ifResp, err := kapi.Get(context.Background(), targetKey, nil)
 	if err != nil {
 		logger(fmt.Sprintf("ERROR GETTING PARENTIF FROM ETCD: %v / %v @ %v", podname, err, targetKey))
-		return err, parentiface, parentaddr
-	} else {
-		parentiface = ifResp.Node.Value
+		return parentiface, parentaddr, err
 	}
-
+	
+	// We properly have a parent interface.
+	parentiface = ifResp.Node.Value
+	
 	targetKey2 := "/ratchet/association/" + podname + "/parentaddr"
 	addrResp, err2 := kapi.Get(context.Background(), targetKey2, nil)
 	if err2 != nil {
 		logger(fmt.Sprintf("ERROR GETTING PARENTADDR FROM ETCD: %v / %v", podname, err2, targetKey2))
-		return err2, parentiface, parentaddr
-	} else {
-		parentaddr = addrResp.Node.Value
+		return parentiface, parentaddr, err2
 	}
-
-	return nil, parentiface, parentaddr
+	
+	parentaddr = addrResp.Node.Value
+	
+	return parentiface, parentaddr, nil
 
 }
 
-func getVxLanId() (error, int) {
+func getVxLanID() (int, error) {
 
 	targetKey := "/ratchet/vxlanid"
 	vxlanidResp, err := kapi.Get(context.Background(), targetKey, nil)
@@ -291,31 +292,31 @@ func getVxLanId() (error, int) {
 
 		// Let's assume that means we don't have this set.
 		// so let's default it.
-		_, err2 := kapi.Set(context.Background(), targetKey, strconv.Itoa(beginningVxlanId+1), nil)
+		_, err2 := kapi.Set(context.Background(), targetKey, strconv.Itoa(beginningVxlanID+1), nil)
 		if err2 != nil {
 			logger(fmt.Sprintf("SETETCD getVxLan-Id ERROR: %v", err2))
-			return err2, 0
+			return 0, err2
 		}
 
-		return nil, beginningVxlanId
+		return beginningVxlanID, nil
 
-	} else {
-		// Ok pick up the current one.
-		vxlanstring := vxlanidResp.Node.Value
-
-		// Convert it to an int
-		vxlanid, _ := strconv.Atoi(vxlanstring)
-
-		// Increment it, and set it.
-		_, err2 := kapi.Set(context.Background(), targetKey, strconv.Itoa(vxlanid+1), nil)
-		if err2 != nil {
-			logger(fmt.Sprintf("SETETCD increment getVxLan-Id ERROR: %v", err2))
-			return err2, 0
-		}
-
-		// Return the current one.
-		return nil, vxlanid
 	}
+
+	// Ok pick up the current one.
+	vxlanstring := vxlanidResp.Node.Value
+
+	// Convert it to an int
+	vxlanid, _ := strconv.Atoi(vxlanstring)
+
+	// Increment it, and set it.
+	_, err2 := kapi.Set(context.Background(), targetKey, strconv.Itoa(vxlanid+1), nil)
+	if err2 != nil {
+		logger(fmt.Sprintf("SETETCD increment getVxLan-Id ERROR: %v", err2))
+		return 0, err2
+	}
+
+	// Return the current one.
+	return vxlanid, nil
 
 }
 
@@ -378,125 +379,106 @@ func isPrimaryContainerAlive(podname string) (string, string, string, string) {
 
 }
 
-func ratchet(argif string, containerid string, linki LinkInfo) error {
+func pairWait(containerid string, linki LinkInfo) error {
 
-	logger(fmt.Sprintf("ratchet LinkInfo: %v", linki))
+	// Ok, we're not primary (we are the pair). So, go into a wait loop.
+	// we need to find out when the primary finishes.
+	// then we can create our vxlan, if need be.
+	primarytries := 0
 
-	// We no longer care if we're alive anymore.
-	// If this is up, we can assume the infra container is good to go.
-	// So all we need to do is associate our containerid with our name.
-	_, vxlanid := associateEtcdInfo(containerid, linki)
+	var primaryname, primaryvxlanid, pairip, pairifname string
 
-	// !bang
-	// If it's determined that we're alive, now we can see if we're primary.
-	// If we're not primary, we can just exit right now.
-	// Cause the primary side will add to this pair.
+	for {
 
-	if linki.Primary != "true" {
+		primaryname, primaryvxlanid, pairip, pairifname = isPrimaryContainerAlive(linki.PodName)
 
-		// Ok, we're not primary (we are the pair). So...
-		// we need to find out when the primary finishes.
-		// then we can create our vxlan, if need be.
-		primarytries := 0
-
-		var primaryname, primaryvxlanid, pairip, pairifname string
-
-		for {
-
-			primaryname, primaryvxlanid, pairip, pairifname = isPrimaryContainerAlive(linki.PodName)
-
-			if len(primaryname) >= 1 {
-				// We found it.
-				logger(fmt.Sprintf("FOUND PRIMARY: %v", primaryname))
-				break
-			}
-
-			primarytries++
-
-			if debug {
-				logger(fmt.Sprintf("Is PRIMARY alive? primaryname: %v (%v retries)", linki.PodName, primarytries))
-			}
-
-			// We either timeout, or, we're alive.
-			if primarytries >= aliveWaitRetries {
-				return fmt.Errorf("Timeout: could not find that PRIMARY container is alive via metadata in %v tries", primarytries)
-			}
-
-			// Wait for however long.
-			time.Sleep(aliveWaitSeconds * time.Second)
-
+		if len(primaryname) >= 1 {
+			// We found it.
+			logger(fmt.Sprintf("FOUND PRIMARY: %v", primaryname))
+			break
 		}
 
-		primaryparentinfoerr, _, primaryparentaddr := getVxLanParentInfo(primaryname)
-		if primaryparentinfoerr != nil {
-			return primaryparentinfoerr
+		primarytries++
+
+		if debug {
+			logger(fmt.Sprintf("Is PRIMARY alive? primaryname: %v (%v retries)", linki.PodName, primarytries))
 		}
 
-		// Determine if we're going to use vxlan.
-		pairusevxlan := false
-
-		if linki.ParentAddr != primaryparentaddr {
-			pairusevxlan = true
+		// We either timeout, or, we're alive.
+		if primarytries >= aliveWaitRetries {
+			return fmt.Errorf("Timeout: could not find that PRIMARY container is alive via metadata in %v tries", primarytries)
 		}
 
-		if pairusevxlan {
-
-			// Alright, create a vxlan interface, w00t.
-
-			// We need a veth generally.
-			pairns, errpairns := koko.GetDockerContainerNS(containerid)
-			if errpairns != nil {
-				return fmt.Errorf("failed to get pairns (pair) %v: %v", containerid, errpairns)
-			}
-
-			ippair, maskpair, errpairparsecidr := net.ParseCIDR(pairip + "/24")
-			if errpairparsecidr != nil {
-				return fmt.Errorf("failed to parse IP (pairparse) %s: %v", linki.LocalIP+"/24", errpairparsecidr)
-			}
-			ipaddrpair := net.IPNet{
-				IP:   ippair,
-				Mask: maskpair.Mask,
-			}
-
-			vethpair := koko.VEth{}
-			vethpair.NsName = pairns
-			vethpair.IPAddr = append(vethpair.IPAddr, ipaddrpair)
-			vethpair.LinkName = pairifname
-
-			// Set the vxlan properties.
-			vxlanpair := koko.VxLan{}
-			vxlanpair.ParentIF = linki.ParentIface
-			vxlanpair.IPAddr = net.ParseIP(primaryparentaddr)
-			useprimaryvxlanid, _ := strconv.Atoi(primaryvxlanid)
-			vxlanpair.ID = useprimaryvxlanid
-
-			// Log it all.
-			logger(fmt.Sprintf("(pair) VXLAN INFO: %v", vxlanpair))
-			logger(fmt.Sprintf("(pair) VETH INFO: %v", vethpair))
-
-			// Now ask koko to do it?
-			errvxlan := koko.MakeVxLan(vethpair, vxlanpair)
-
-			if errvxlan != nil {
-				logger(fmt.Sprintf("(pair) VXLAN ERROR: %v", errvxlan))
-				return errvxlan
-			}
-
-		}
-
-		return nil
+		// Wait for however long.
+		time.Sleep(aliveWaitSeconds * time.Second)
 
 	}
 
-	// Check to see there's a valid pair name.
-	if len(linki.PairName) <= 1 {
-		// That's not good.
-		return fmt.Errorf("Pair name appears to be invalid: %v", linki.PairName)
+	_, primaryparentaddr, primaryparentinfoerr := getVxLanParentInfo(primaryname)
+	if primaryparentinfoerr != nil {
+		return primaryparentinfoerr
 	}
 
-	// Now we want to check and see if the pair container is alive.
-	// So it's time to go into a loop and do that.
-	// if the pair container is alive -- bada bing, we can execute koko.
+	// Determine if we're going to use vxlan.
+	// Which we do by comparing the vxlan parent addresses.
+	pairusevxlan := false
+
+	if linki.ParentAddr != primaryparentaddr {
+		pairusevxlan = true
+	}
+
+	if pairusevxlan {
+
+		// Alright, create a vxlan interface, w00t.
+
+		// We need a veth generally.
+		pairns, errpairns := koko.GetDockerContainerNS(containerid)
+		if errpairns != nil {
+			return fmt.Errorf("failed to get pairns (pair) %v: %v", containerid, errpairns)
+		}
+
+		ippair, maskpair, errpairparsecidr := net.ParseCIDR(pairip + "/24")
+		if errpairparsecidr != nil {
+			return fmt.Errorf("failed to parse IP (pairparse) %s: %v", linki.LocalIP+"/24", errpairparsecidr)
+		}
+		ipaddrpair := net.IPNet{
+			IP:   ippair,
+			Mask: maskpair.Mask,
+		}
+
+		vethpair := koko.VEth{}
+		vethpair.NsName = pairns
+		vethpair.IPAddr = append(vethpair.IPAddr, ipaddrpair)
+		vethpair.LinkName = pairifname
+
+		// Set the vxlan properties.
+		vxlanpair := koko.VxLan{}
+		vxlanpair.ParentIF = linki.ParentIface
+		vxlanpair.IPAddr = net.ParseIP(primaryparentaddr)
+		useprimaryvxlanid, _ := strconv.Atoi(primaryvxlanid)
+		vxlanpair.ID = useprimaryvxlanid
+
+		// Log it all.
+		logger(fmt.Sprintf("(pair) VXLAN INFO: %v", vxlanpair))
+		logger(fmt.Sprintf("(pair) VETH INFO: %v", vethpair))
+
+		// Now ask koko to do it?
+		errvxlan := koko.MakeVxLan(vethpair, vxlanpair)
+
+		if errvxlan != nil {
+			logger(fmt.Sprintf("(pair) VXLAN ERROR: %v", errvxlan))
+			return errvxlan
+		}
+
+		logger("Koko VXLAN creation, success (pair)")
+
+	}
+
+	return nil
+
+}
+
+func primaryWait(linki LinkInfo) (string, error) {
 
 	var pairContainerID string
 	tries := 0
@@ -518,12 +500,50 @@ func ratchet(argif string, containerid string, linki LinkInfo) error {
 
 		// We either timeout, or, we're alive.
 		if tries >= aliveWaitRetries {
-			return fmt.Errorf("Timeout: could not find that pair container is alive via metadata in %v tries", tries)
+			return "", fmt.Errorf("Timeout: could not find that pair container is alive via metadata in %v tries", tries)
 		}
 
 		// Wait for however long.
 		time.Sleep(aliveWaitSeconds * time.Second)
 
+	}
+
+	return pairContainerID, nil
+
+}
+
+func ratchet(argif string, containerid string, linki LinkInfo) error {
+
+	logger(fmt.Sprintf("ratchet LinkInfo: %v", linki))
+
+	// If this is up, we can assume the infra container is good to go.
+	// So all we need to do is associate our containerid with our name.
+	vxlanid, _ := associateEtcdInfo(containerid, linki)
+
+	// !bang
+	// If it's determined that we're alive, now we can see if we're primary.
+	// If we're not primary, we can just exit right now.
+	// Cause the primary side will add to this pair.
+
+	if linki.Primary != "true" {
+
+		return pairWait(containerid, linki)
+
+	}
+
+	// Check to see there's a valid pair name.
+	if len(linki.PairName) <= 1 {
+		// That's not good.
+		return fmt.Errorf("Pair name appears to be invalid: %v", linki.PairName)
+	}
+
+	// Now we want to check and see if the pair container is alive.
+	// So it's time to go into a loop and do that.
+	// if the pair container is alive -- bada bing, we can execute koko.
+
+	pairContainerID, waiterror := primaryWait(linki)
+	if waiterror != nil {
+		return waiterror
 	}
 
 	// Now, we can probably rock out all the
@@ -535,7 +555,7 @@ func ratchet(argif string, containerid string, linki LinkInfo) error {
 	time.Sleep(delayKokoSeconds * time.Second)
 
 	// Let's pick up the pair's parent interface info.
-	parentinfoerr, pairparentiface, pairparentaddr := getVxLanParentInfo(linki.PairName)
+	pairparentiface, pairparentaddr, parentinfoerr := getVxLanParentInfo(linki.PairName)
 	if parentinfoerr != nil {
 		return parentinfoerr
 	}
@@ -615,8 +635,7 @@ func ratchet(argif string, containerid string, linki LinkInfo) error {
 			return errvxlan
 		}
 
-		// Here's where you trigger the remote???
-		// ...we might go into a wait loop on the pair.
+		logger("Koko VXLAN creation, success (primary)")
 
 	} else {
 
@@ -653,9 +672,9 @@ func ratchet(argif string, containerid string, linki LinkInfo) error {
 			return kokoErr
 		}
 
-	}
+		logger("Koko VETH creation, success (primary)")
 
-	logger("Koko appears to have completed with success.")
+	}
 
 	return nil
 

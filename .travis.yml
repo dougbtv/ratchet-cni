@@ -17,6 +17,8 @@ install:
 before_install:
   # Get the linter.
   - go get github.com/golang/lint/golint
+  # Install gocyclo
+  - go get github.com/fzipp/gocyclo
   # Clone CNI repo proper
   - git clone https://github.com/containernetworking/cni.git /tmp/cni
   # Clone the default plugins.
@@ -26,7 +28,11 @@ before_install:
 
 script:
   # Check the gofmt
-  - if [ -n "$(gofmt -l ./ratchet*)" ]; then exit 1; fi;
+  - if [ -n "$(gofmt -l ./ratchet*)" ]; then echo "you forgot gofmt, huh, bummer." && exit 1; fi;
+  # Check gocyclo
+  - if [ -n "$($HOME/gopath/bin/gocyclo -over 15 ./ratchet*)" ]; then echo "too much cyclomatic complexity, boo" && exit 1; fi;
+  # Check the golint
+  - if [ -n "$($HOME/gopath/bin/golint ./ratchet*)" ]; then echo "darn, lint failed up" && exit 1; fi;
   # Build out ratchet proper.
   - pwd
   - mkdir bin
