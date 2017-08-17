@@ -189,7 +189,7 @@ func getEtcdMetaData(containerid string, setalive bool) map[string]string {
 
 }
 
-func associateEtcdInfo(containerid string, linki LinkInfo) (int,error) {
+func associateEtcdInfo(containerid string, linki LinkInfo) (int, error) {
 
 	var vxlanid = 0
 
@@ -197,19 +197,19 @@ func associateEtcdInfo(containerid string, linki LinkInfo) (int,error) {
 	_, err := kapi.Set(context.Background(), "/ratchet/association/"+linki.PodName+"/id", containerid, nil)
 	if err != nil {
 		logger(fmt.Sprintf("SETETCD ASSOC ERROR: %v", err))
-		return 0,err
+		return 0, err
 	}
 
 	_, err2 := kapi.Set(context.Background(), "/ratchet/association/"+linki.PodName+"/parentiface", linki.ParentIface, nil)
 	if err2 != nil {
 		logger(fmt.Sprintf("SETETCD parentiface ERROR: %v", err2))
-		return 0,err2
+		return 0, err2
 	}
 
 	_, err3 := kapi.Set(context.Background(), "/ratchet/association/"+linki.PodName+"/parentaddr", linki.ParentAddr, nil)
 	if err3 != nil {
 		logger(fmt.Sprintf("SETETCD parentaddr ERROR: %v", err3))
-		return 0,err3
+		return 0, err3
 	}
 
 	// Things the primary also stores....
@@ -222,28 +222,28 @@ func associateEtcdInfo(containerid string, linki LinkInfo) (int,error) {
 		_, err5 := kapi.Set(context.Background(), "/ratchet/association/"+linki.PairName+"/vxlanid", strconv.Itoa(vxlanid), nil)
 		if err5 != nil {
 			logger(fmt.Sprintf("SETETCD vxlanid assoc ERROR: %v", err5))
-			return 0,err5
+			return 0, err5
 		}
 
 		// and we have to save the pair IP.
 		_, err6 := kapi.Set(context.Background(), "/ratchet/association/"+linki.PairName+"/pairip", linki.PairIP, nil)
 		if err6 != nil {
 			logger(fmt.Sprintf("SETETCD primaryname ERROR: %v", err6))
-			return 0,err6
+			return 0, err6
 		}
 
 		// and we have to save the pair interface.
 		_, err7 := kapi.Set(context.Background(), "/ratchet/association/"+linki.PairName+"/pairifname", linki.PairIFName, nil)
 		if err7 != nil {
 			logger(fmt.Sprintf("SETETCD primaryname ERROR: %v", err7))
-			return 0,err7
+			return 0, err7
 		}
 
 		// we're primary, we need to let the pair know how to find the primary.
 		_, err4 := kapi.Set(context.Background(), "/ratchet/association/"+linki.PairName+"/primaryname", linki.PodName, nil)
 		if err4 != nil {
 			logger(fmt.Sprintf("SETETCD primaryname ERROR: %v", err4))
-			return 0,err4
+			return 0, err4
 		}
 
 	}
@@ -252,7 +252,7 @@ func associateEtcdInfo(containerid string, linki LinkInfo) (int,error) {
 
 }
 
-func getVxLanParentInfo(podname string) (string, string,error) {
+func getVxLanParentInfo(podname string) (string, string, error) {
 
 	var parentiface = ""
 	var parentaddr = ""
@@ -263,19 +263,19 @@ func getVxLanParentInfo(podname string) (string, string,error) {
 		logger(fmt.Sprintf("ERROR GETTING PARENTIF FROM ETCD: %v / %v @ %v", podname, err, targetKey))
 		return parentiface, parentaddr, err
 	}
-	
+
 	// We properly have a parent interface.
 	parentiface = ifResp.Node.Value
-	
+
 	targetKey2 := "/ratchet/association/" + podname + "/parentaddr"
 	addrResp, err2 := kapi.Get(context.Background(), targetKey2, nil)
 	if err2 != nil {
 		logger(fmt.Sprintf("ERROR GETTING PARENTADDR FROM ETCD: %v / %v", podname, err2, targetKey2))
 		return parentiface, parentaddr, err2
 	}
-	
+
 	parentaddr = addrResp.Node.Value
-	
+
 	return parentiface, parentaddr, nil
 
 }
